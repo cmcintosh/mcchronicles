@@ -162,8 +162,7 @@ export class Game {
    * Called when starting a new game or loading a save.
    */
   async _preloadModels() {
-    // Don't block game start — models load on-demand with procedural fallbacks
-    // Just mark as preloaded so we skip the loading screen entirely
+    // Models are now procedural (no GLB loading needed)
     this._modelsPreloaded = true;
   }
 
@@ -869,14 +868,12 @@ export class Game {
     this.playerRotation = 0;
     this.encounterCooldown = 2.0;
 
-    // Create player mesh if not exists (use GLB model)
+    // Create player mesh if not exists (procedural model)
     if (!this.playerMesh) {
-      try {
-        this.playerMesh = await this.assetManager.loadModel(this.partyMemberIds[0]);
-      } catch (e) {
-        this.playerMesh = this.assetManager.createCharacterMesh(this.partyMemberIds[0]);
-      }
+      this.playerMesh = this.assetManager.createCharacterMesh(this.partyMemberIds[0]);
     }
+
+    // Transition to overworld scene
 
     // Transition to overworld scene
     this.state = GameState.OVERWORLD;
@@ -917,12 +914,7 @@ export class Game {
     for (let i = 0; i < monsterIds.length; i++) {
       const id = monsterIds[i];
       const monster = MONSTERS[id];
-      let mesh;
-      try {
-        mesh = await this.assetManager.loadModel(id);
-      } catch (e) {
-        mesh = this.assetManager.createMonsterMesh(id);
-      }
+      const mesh = this.assetManager.createMonsterMesh(id);
       const stats = { ...(monster?.stats || { hp: 50, atk: 10, def: 5, agi: 10, mag: 5, mp: 0 }) };
       enemies.push({
         id,
@@ -963,11 +955,7 @@ export class Game {
         mag: member.mag,
       };
       let mesh;
-      try {
-        mesh = await this.assetManager.loadModel(member.id);
-      } catch (e) {
-        mesh = this.assetManager.createCharacterMesh(member.id);
-      }
+      mesh = this.assetManager.createCharacterMesh(member.id);
       battleParty.push({
         ...member,
         stats,
