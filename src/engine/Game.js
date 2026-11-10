@@ -162,29 +162,9 @@ export class Game {
    * Called when starting a new game or loading a save.
    */
   async _preloadModels() {
-    if (this._modelsPreloaded) return;
-    if (this._preloadingModels) {
-      // Wait for existing preload to finish
-      while (this._preloadingModels) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-      return;
-    }
-
-    this._preloadingModels = true;
-
-    // Show loading screen
-    this._showLoadingScreen('Loading 3D Models...');
-
-    try {
-      await this.assetManager.preloadAllModels();
-      this._modelsPreloaded = true;
-    } catch (e) {
-      console.warn('Model preloading had errors, using procedural fallbacks:', e);
-    } finally {
-      this._hideLoadingScreen();
-      this._preloadingModels = false;
-    }
+    // Don't block game start — models load on-demand with procedural fallbacks
+    // Just mark as preloaded so we skip the loading screen entirely
+    this._modelsPreloaded = true;
   }
 
   _showLoadingScreen(text) {

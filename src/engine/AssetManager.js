@@ -27,7 +27,31 @@ export class AssetManager {
   }
 
   // === Load a GLB model and return a THREE.Group ===
+  // Returns a procedural fallback immediately; swaps in GLB when loaded
   async loadModel(name) {
+    if (this.modelCache.has(name)) {
+      return this.modelCache.get(name).clone(true);
+    }
+
+    // Return procedural fallback immediately (synchronous)
+    const fallback = this._getProceduralFallback(name);
+
+    // Kick off async GLB load in background
+    this._loadGLBInBackground(name).then((model) => {
+      if (model) {
+        // Copy the GLB's children into the fallback group
+        fallback.clear();
+        model.children.forEach(child => fallback.add(child.clone(true)));
+        fallback.position.copy(model.position);
+        fallback.scale.copy(model.scale);
+      }
+    }).catch(() => {/* stay with fallback */});
+
+    return fallback;
+  }
+
+  // === Internal: actually load the GLB ===
+  async _loadGLBInBackground(name) {
     if (this.modelCache.has(name)) {
       return this.modelCache.get(name).clone(true);
     }
@@ -40,7 +64,6 @@ export class AssetManager {
       // Apply toon material override to all meshes
       model.traverse((child) => {
         if (child.isMesh) {
-          // Keep the original geometry but apply toon material
           const originalColor = child.material?.color?.clone() || new THREE.Color(0xcccccc);
           child.material = this.shaderManager.createToonMaterial(originalColor.getHex());
           child.castShadow = true;
@@ -69,7 +92,7 @@ export class AssetManager {
       return model.clone(true);
     } catch (err) {
       console.warn(`Failed to load GLB model ${name}, using procedural fallback:`, err);
-      return this._getProceduralFallback(name);
+      return null;
     }
   }
 
