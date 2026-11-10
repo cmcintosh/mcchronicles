@@ -24,7 +24,15 @@ export default class MusicEngine {
    * Initialize — called after AudioEngine.init()
    */
   async init() {
-    await Tone.start();
+    try {
+      await Tone.start();
+      // Explicitly resume Tone's context (browser autoplay policy)
+      if (Tone.context && Tone.context.state === 'suspended') {
+        await Tone.context.resume();
+      }
+    } catch (e) {
+      console.warn('[MusicEngine] Tone.start() failed:', e);
+    }
 
     // Connect Tone.js destination to our music bus
     const musicBus = this.audioEngine.getBus('music');
@@ -58,6 +66,12 @@ export default class MusicEngine {
     const trackDef = TRACK_DEFINITIONS[trackId];
     if (!trackDef) {
       console.warn(`[MusicEngine] Unknown track: ${trackId}`);
+      return;
+    }
+
+    // Guard: ensure Tone context is running before playing
+    if (Tone.context && Tone.context.state !== 'running') {
+      console.warn(`[MusicEngine] Skipping track ${trackId}: audio context ${Tone.context.state}`);
       return;
     }
 
