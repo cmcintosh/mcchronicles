@@ -6,40 +6,87 @@
 
 ---
 
+## 0. Sonic Identity — McDonald's In-Store Music Research
+
+### Research Findings (Nov 2026)
+McDonald's restaurants in the US use branded radio services (e.g., YourBrandsRadio) with 6 curated stations:
+- **Pop Now** — Current chart-topping pop hits (primary station)
+- **80s Rewind** — MTV-era hits 1978-1992 (nostalgia)
+- Plus country, classic hits, and seasonal stations
+
+**Key characteristics of McDonald's in-store music:**
+- **Genre:** Upbeat contemporary pop, family-friendly, feel-good
+- **Tempo:** 110-130 BPM during peak hours (encourages table turnover); calmer in evenings
+- **Curation:** Brand-fit — songs matching McDonald's core values (positive, accessible, energetic)
+- **McDonald's official Spotify playlists:** "New Music Tunesday" and "good vibes only"
+- **Classical music edge case:** Some UK locations play classical in evenings to calm crowds
+
+**Swedish behavioral study (1.8M transactions, 16 restaurants, 5 months):**
+- Brand-fit curated music: +9.1% sales, +15.6% dessert sales
+- Random uncurated pop: -4.3% sales (worse than silence)
+- Key insight: Curation and brand alignment matter more than familiarity
+
+### Translation to McChronicles JRPG
+
+**Core sonic identity: Upbeat, pop-influenced, optimistic, family-friendly**
+
+| McDonald's Trait | McChronicles Translation |
+|------------------|--------------------------|
+| Upbeat pop melodies | Catchy, accessible melodic hooks in major keys for overworld/town |
+| Feel-good energy | Baseline emotional tone is warm and positive — even dramatic moments have underlying warmth |
+| 80s nostalgia station | 80s synth/pop textures for retro-themed areas (Drive-Thru Desert ruins, arcade mini-games) |
+| Family-friendly | No dissonant horror — even Shadow Realm uses melodic minor-key, not atonal |
+| Classical in evenings | Castle/temple areas use classical/orchestral textures (organ, strings, choir) |
+| Fast tempo peak hours | Battle/boss tracks at 140-170 BPM with pop-rock energy |
+| Brand-fit curation | Every track maintains "McDonald's warmth" — even sad songs have a hopeful undercurrent |
+
+**Instrumentation inspired by McDonald's sonic palette:**
+- **Pop overworld tracks:** Synth leads (analog-style), upbeat drums, catchy bass lines, bell/glockenspiel accents
+- **80s nostalgia tracks:** FM synth pads, drum machine, electric piano, slap bass
+- **Town hub tracks:** Warm jazz piano, acoustic guitar, light percussion (McCafe vibe)
+- **Battle tracks:** Pop-rock — electric guitar, driving drums, synth stabs
+- **Emotional tracks:** Solo piano → strings (still melodic, never atonal)
+- **Castle/epic tracks:** Organ, choir, orchestral — classical influence
+- **Mini-game tracks:** Chiptune/8-bit — arcade nostalgia
+
+---
+
 ## 1. Music Design (20 tracks)
 
 ### Track List
 
 | # | Track Name | Purpose | Mood | Tempo | Length | Loop |
 |---|-----------|---------|------|-------|--------|------|
-| M01 | McWorld Overture | Title screen | Whimsical, inviting, orchestral | 90 BPM | 2:30 | Yes |
-| M02 | Fry Valley Fields | Fry Valley overworld | Bright, adventurous, folk | 110 BPM | 2:00 | Yes |
-| M03 | Highland Trek | Burger Highlands overworld | Majestic, determined | 100 BPM | 2:00 | Yes |
-| M04 | Cafe Corner | McCafe Springs town | Cozy, warm, jazz piano | 80 BPM | 2:30 | Yes |
-| M05 | Frozen Melody | McFlurry Tundra overworld | Ethereal, cold, crystalline | 70 BPM | 2:00 | Yes |
-| M06 | Desert Mirage | Drive-Thru Desert overworld | Mysterious, sparse, Arabian | 85 BPM | 2:00 | Yes |
-| M07 | Toyland Waltz | Happy Meal Forest overworld | Playful, magical, music box | 120 BPM | 1:45 | Yes |
-| M08 | Playground Hero | Play Place Plains overworld | Energetic, fun, pop | 130 BPM | 1:45 | Yes |
-| M09 | Golden Throne | Golden Arches Castle | Epic, solemn, organ | 60 BPM | 2:30 | Yes |
-| M10 | Shadow Realm | Shadow Realm | Dark, dissonant, ambient | 50 BPM | 3:00 | Yes |
-| M11 | Battle Beat | Standard battle | Tense, driving, rock | 140 BPM | 1:30 | Yes |
-| M12 | Boss Battle | Boss battle | Dramatic, heavy, orchestral | 150 BPM | 2:00 | Yes |
-| M13 | Hamburglar's Theme | Hamburglar confrontation | Emotional, conflicted, minor key | 75 BPM | 2:30 | Yes |
-| M14 | McLord's Shadow | Final boss (phases 1-3) | Epic, dark, massive | 160 BPM | 3:00 | Yes |
-| M15 | Golden Purification | Final boss phase 4 | Triumphant, orchestral, uplifting | 170 BPM | 2:00 | No |
-| M16 | Victory Fanfare | Battle victory | Triumphant, short | 120 BPM | 0:15 | No |
-| M17 | Restful Night | Inn/save | Calm, peaceful, lullaby | 60 BPM | 1:30 | Yes |
-| M18 | Heart Strings | Emotional scenes | Sad, strings, slow | 50 BPM | 2:00 | Yes |
-| M19 | Mini-Game Mix | Mini-games | Fun, bouncy, chiptune | 135 BPM | 1:30 | Yes |
-| M20 | Breakfast Dawn | Post-game (Breakfast Kingdom) | Adventurous, fresh, new | 115 BPM | 2:00 | Yes |
+| M01 | McWorld Overture | Title screen | Upbeat pop-orchestral, catchy hook, feel-good | 110 BPM | 2:30 | Yes |
+| M02 | Fry Valley Fields | Fry Valley overworld | Bright synth-pop, adventurous, upbeat | 115 BPM | 2:00 | Yes |
+| M03 | Highland Trek | Burger Highlands overworld | Driving pop-rock, determined, energetic | 120 BPM | 2:00 | Yes |
+| M04 | Cafe Corner | McCafe Springs town | Warm jazz-pop, cozy, acoustic guitar + piano | 90 BPM | 2:30 | Yes |
+| M05 | Frozen Melody | McFlurry Tundra overworld | Crystalline synth-pop, ethereal but warm | 100 BPM | 2:00 | Yes |
+| M06 | Desert Mirage | Drive-Thru Desert overworld | 80s FM synth, nostalgic, MTV-era adventure | 105 BPM | 2:00 | Yes |
+| M07 | Toyland Waltz | Happy Meal Forest overworld | Music box + pop, playful, magical, catchy | 120 BPM | 1:45 | Yes |
+| M08 | Playground Hero | Play Place Plains overworld | High-energy pop, chart-hit vibe, fun | 130 BPM | 1:45 | Yes |
+| M09 | Golden Throne | Golden Arches Castle | Classical organ + choir, epic but melodic | 70 BPM | 2:30 | Yes |
+| M10 | Shadow Realm | Shadow Realm | Dark melodic minor key, never atonal, ambient | 60 BPM | 3:00 | Yes |
+| M11 | Battle Beat | Standard battle | Pop-rock, driving, upbeat tension | 140 BPM | 1:30 | Yes |
+| M12 | Boss Battle | Boss battle | Dramatic pop-orchestral, heavy but melodic | 150 BPM | 2:00 | Yes |
+| M13 | Hamburglar's Theme | Hamburglar confrontation | Emotional pop-ballad, minor key, hopeful undercurrent | 80 BPM | 2:30 | Yes |
+| M14 | McLord's Shadow | Final boss (phases 1-3) | Epic dark orchestral, driving, intense | 160 BPM | 3:00 | Yes |
+| M15 | Golden Purification | Final boss phase 4 | Triumphant pop-orchestral, uplifting, massive | 170 BPM | 2:00 | No |
+| M16 | Victory Fanfare | Battle victory | Short pop fanfare, catchy, celebratory | 120 BPM | 0:15 | No |
+| M17 | Restful Night | Inn/save | Calm acoustic pop, peaceful, warm | 70 BPM | 1:30 | Yes |
+| M18 | Heart Strings | Emotional scenes | Solo piano → strings, sad but hopeful, melodic | 60 BPM | 2:00 | Yes |
+| M19 | Mini-Game Mix | Mini-games | 8-bit chiptune pop, arcade nostalgia, bouncy | 135 BPM | 1:30 | Yes |
+| M20 | Breakfast Dawn | Post-game (Breakfast Kingdom) | Fresh upbeat pop, adventurous, new energy | 115 BPM | 2:00 | Yes |
 
-### McDonald's-Themed Instrumentation
-- **Lead melodies:** Glockenspiel, music box, xylophone (whimsical, toy-like)
-- **Bass:** Upright bass, synth bass (warm, grounded)
-- **Percussion:** Light percussion, hand claps, tambourine (playful)
-- **Atmosphere:** Celesta, choir aahs (magical, dreamy)
-- **Battle:** Electric guitar, driving drums (energetic)
-- **Emotional:** Solo piano, strings (intimate)
+### McDonald's-Inspired Instrumentation
+- **Pop overworld/town leads:** Analog-style synth leads (triangle/sawtooth), glockenspiel, xylophone — catchy, accessible melodic hooks like current chart pop
+- **80s nostalgia tracks (Desert, mini-games):** FM synth pads, drum machine, electric piano, slap bass — MTV-era sonic palette
+- **Town hub (McCafe Springs):** Warm jazz piano, acoustic guitar, light percussion, upright bass — coffee shop vibe
+- **Battle tracks:** Pop-rock — electric guitar, driving drums, synth stabs, bass guitar — upbeat energy, not metal
+- **Emotional tracks:** Solo piano → strings — melodic, never atonal, always a hopeful undercurrent (brand-fit warmth)
+- **Castle/epic tracks:** Pipe organ, choir (aahs), orchestral strings — classical influence (McDonald's evening classical)
+- **Mini-game tracks:** 8-bit/chiptune — NES-era square waves, arcade nostalgia
+- **Atmosphere layer:** Celesta, choir aahs, bell pads — dreamy, magical (whimsical McDonald's brand tone)
 
 ---
 
