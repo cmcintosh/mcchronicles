@@ -843,11 +843,12 @@ export class Game {
 
       // Process dialogue effects even if skipped
       if (dialogue?.unlocks) {
-        for (const charId of dialogue.unlocks) {
-          if (!this.recruitedIds.includes(charId)) {
-            this.recruitedIds.push(charId);
-            this.partyMemberIds.push(charId);
-            this.party.push(this._createPartyMember(charId));
+        for (const unlockId of dialogue.unlocks) {
+          // Only recruit if this is a valid character ID
+          if (CHARACTERS[unlockId] && !this.recruitedIds.includes(unlockId)) {
+            this.recruitedIds.push(unlockId);
+            this.partyMemberIds.push(unlockId);
+            this.party.push(this._createPartyMember(unlockId));
           }
         }
       }
@@ -1256,11 +1257,12 @@ export class Game {
 
       // Process dialogue effects
       if (dialogue?.unlocks) {
-        for (const charId of dialogue.unlocks) {
-          if (!this.recruitedIds.includes(charId)) {
-            this.recruitedIds.push(charId);
-            this.partyMemberIds.push(charId);
-            this.party.push(this._createPartyMember(charId));
+        for (const unlockId of dialogue.unlocks) {
+          // Only recruit if this is a valid character ID
+          if (CHARACTERS[unlockId] && !this.recruitedIds.includes(unlockId)) {
+            this.recruitedIds.push(unlockId);
+            this.partyMemberIds.push(unlockId);
+            this.party.push(this._createPartyMember(unlockId));
           }
         }
       }
