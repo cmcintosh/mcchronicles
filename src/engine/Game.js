@@ -1200,6 +1200,15 @@ export class Game {
     this.currentDialogue = dialogueData;
     this.dialogueIndex = 0;
 
+    // Build dialogue options with backdrop and voice prefix
+    const dialogueOptions = {};
+    if (dialogueData.backdrop) {
+      dialogueOptions.backdrop = dialogueData.backdrop;
+    }
+    if (dialogueData.id) {
+      dialogueOptions.voicePrefix = `/voice/${dialogueData.id}`;
+    }
+
     // Show dialogue box with all lines
     const lines = dialogueData.dialogue.map(l => ({ speaker: l.speaker, text: l.text }));
     this.dialogueBox.show(lines, () => {
@@ -1228,7 +1237,7 @@ export class Game {
       if (dialogue?.id) {
         this.questSystem.seeStoryBeat(dialogue.id);
       }
-    });
+    }, dialogueOptions);
   }
 
   // === Save / Load ===

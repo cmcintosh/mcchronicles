@@ -3,6 +3,7 @@
 export const STORY_BEATS = {
   game_start: {
     id: 'game_start',
+    backdrop: '/backdrops/game_start.png',
     dialogue: [
       { speaker: 'Narrator', text: 'In a world where burgers are life and fries are freedom...' },
       { speaker: 'Narrator', text: 'A darkness fell upon the McWorld.' },
@@ -16,6 +17,7 @@ export const STORY_BEATS = {
 
   fry_valley_intro: {
     id: 'fry_valley_intro',
+    backdrop: '/backdrops/fry_valley_intro.png',
     dialogue: [
       { speaker: 'Ronald', text: 'Ah, Fry Valley! Home sweet home.' },
       { speaker: 'Grimace', text: 'It\'s so peaceful here. Or... it used to be.' },
@@ -27,6 +29,7 @@ export const STORY_BEATS = {
 
   burger_highlands_intro: {
     id: 'burger_highlands_intro',
+    backdrop: '/backdrops/burger_highlands_intro.png',
     dialogue: [
       { speaker: 'Grimace', text: 'The mountains are so steep! My legs are tired.' },
       { speaker: 'Birdie', text: 'I can fly over them! ...Oh wait, I can\'t actually fly in this game.' },
@@ -37,6 +40,7 @@ export const STORY_BEATS = {
 
   meet_officer_big_mac: {
     id: 'meet_officer_big_mac',
+    backdrop: '/backdrops/meet_officer_big_mac.png',
     dialogue: [
       { speaker: 'Officer Big Mac', text: 'Halt! Who goes there?' },
       { speaker: 'Ronald', text: 'Officer! It\'s me, Ronald. We\'re here to stop the Hamburglar.' },
@@ -51,6 +55,7 @@ export const STORY_BEATS = {
 
   mcflurry_tundra_intro: {
     id: 'mcflurry_tundra_intro',
+    backdrop: '/backdrops/mcflurry_tundra_intro.png',
     dialogue: [
       { speaker: 'Birdie', text: 'Brrr! It\'s freezing! My feathers are icing up!' },
       { speaker: 'Grimace', text: 'I\'m so cold I think I\'m turning blue... er, bluer.' },
@@ -61,6 +66,7 @@ export const STORY_BEATS = {
 
   meet_mac_tonight: {
     id: 'meet_mac_tonight',
+    backdrop: '/backdrops/meet_mac_tonight.png',
     dialogue: [
       { speaker: 'Mac Tonight', text: '♪ Underneath the moonlight... ♪ Oh, hello there!' },
       { speaker: 'Ronald', text: 'Mac Tonight! The famous moon bard! What are you doing out here?' },
@@ -74,6 +80,7 @@ export const STORY_BEATS = {
 
   happy_meal_forest_intro: {
     id: 'happy_meal_forest_intro',
+    backdrop: '/backdrops/happy_meal_forest_intro.png',
     dialogue: [
       { speaker: 'Birdie', text: 'The Happy Meal Forest! I love it here. So many toys!' },
       { speaker: 'Ronald', text: 'Something\'s wrong. The trees look... darker than usual.' },
@@ -84,6 +91,7 @@ export const STORY_BEATS = {
 
   drive_thru_desert_intro: {
     id: 'drive_thru_desert_intro',
+    backdrop: '/backdrops/drive_thru_desert_intro.png',
     dialogue: [
       { speaker: 'Grimace', text: 'So... much... sand. Can we get a McFlurry?' },
       { speaker: 'Birdie', text: 'Look! There\'s a Drive-Thru in the middle of nowhere!' },
@@ -94,6 +102,7 @@ export const STORY_BEATS = {
 
   mccafe_springs_intro: {
     id: 'mccafe_springs_intro',
+    backdrop: '/backdrops/mccafe_springs_intro.png',
     dialogue: [
       { speaker: 'Ronald', text: 'McCafe Springs! The hub of the McWorld.' },
       { speaker: 'Ronald', text: 'We can rest, shop, and save our progress here.' },
@@ -103,6 +112,7 @@ export const STORY_BEATS = {
 
   play_place_plains_intro: {
     id: 'play_place_plains_intro',
+    backdrop: '/backdrops/play_place_plains_intro.png',
     dialogue: [
       { speaker: 'Birdie', text: 'The PlayPlace! I always wanted to explore one of these!' },
       { speaker: 'Grimace', text: 'It\'s... a lot bigger from the inside.' },
@@ -113,6 +123,7 @@ export const STORY_BEATS = {
 
   golden_arches_castle_intro: {
     id: 'golden_arches_castle_intro',
+    backdrop: '/backdrops/golden_arches_castle_intro.png',
     dialogue: [
       { speaker: 'Ronald', text: 'The Golden Arches Castle. The Hamburglar\'s fortress.' },
       { speaker: 'Grimace', text: 'He has so many stolen burgers in there...' },
@@ -124,6 +135,7 @@ export const STORY_BEATS = {
 
   final_boss: {
     id: 'final_boss',
+    backdrop: '/backdrops/final_boss.png',
     dialogue: [
       { speaker: 'Hamburglar', text: 'Robble robble! You\'ve made it this far, have you?' },
       { speaker: 'Ronald', text: 'Hamburglar! Return the burgers you\'ve stolen!' },
@@ -142,6 +154,7 @@ export const STORY_BEATS = {
 
   victory: {
     id: 'victory',
+    backdrop: '/backdrops/victory.png',
     dialogue: [
       { speaker: 'Hamburglar', text: 'You... you beat me. Fair and square.' },
       { speaker: 'Ronald', text: 'It\'s over, Hamburglar. Let\'s go home.' },
