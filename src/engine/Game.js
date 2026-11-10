@@ -1038,6 +1038,14 @@ export class Game {
       return this.autoBattle;
     };
 
+    // Victory/Defeat continue callbacks
+    this.battleUI.callbacks.onVictoryContinue = () => {
+      this.endBattle({ result: 'victory' });
+    };
+    this.battleUI.callbacks.onDefeatContinue = () => {
+      this.endBattle({ result: 'defeat' });
+    };
+
     // Set up battle UI callbacks
     this.battleUI.callbacks.onSelectCommand = (cmd) => {
       const bd = this.battleData;

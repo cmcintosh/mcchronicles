@@ -36,6 +36,15 @@ export default class AudioEngine {
 
     this.ctx = new AudioContextClass();
 
+    // Resume immediately if suspended (browser autoplay policy)
+    if (this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume();
+      } catch (e) {
+        console.warn('[AudioEngine] Could not resume context:', e);
+      }
+    }
+
     // Master gain → destination
     this.master = this.ctx.createGain();
     this.master.gain.value = this.masterVolume;

@@ -1135,7 +1135,7 @@ export default class BattleUI {
       if (isAlive(target) || !isEnemy) {
         entry.addEventListener('click', () => {
           if (this.callbacks.onSelectTarget) {
-            this.callbacks.onSelectTarget(index);
+            this.callbacks.onSelectTarget(target);
           }
         });
       }
@@ -1212,6 +1212,9 @@ export default class BattleUI {
     continueBtn.textContent = 'Continue';
     continueBtn.addEventListener('click', () => {
       screen.classList.remove('visible');
+      if (this.callbacks.onVictoryContinue) {
+        this.callbacks.onVictoryContinue();
+      }
     });
     screen.appendChild(continueBtn);
 
@@ -1240,6 +1243,9 @@ export default class BattleUI {
     continueBtn.textContent = 'Continue';
     continueBtn.addEventListener('click', () => {
       screen.classList.remove('visible');
+      if (this.callbacks.onDefeatContinue) {
+        this.callbacks.onDefeatContinue();
+      }
     });
     screen.appendChild(continueBtn);
 
