@@ -335,4 +335,225 @@ export class AssetManager {
     }
     return this.textureCache.get(key);
   }
+
+  // === Structures (buildings, arches, etc.) ===
+  createStructure(type) {
+    const group = new THREE.Group();
+
+    switch (type) {
+      case 'house': {
+        const wallMat = this._material(0xddccbb);
+        const roofMat = this._material(0x8b4513);
+        const walls = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 1.5), wallMat);
+        walls.position.y = 0.75;
+        group.add(walls);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.0, 4), roofMat);
+        roof.position.y = 1.75;
+        roof.rotation.y = Math.PI / 4;
+        group.add(roof);
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.05), this._material(0x4a2c10));
+        door.position.set(0, 0.45, 0.78);
+        group.add(door);
+        break;
+      }
+      case 'golden_arches': {
+        const archMat = this._material(0xffd700);
+        for (const side of [-1, 1]) {
+          const arch = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.15, 8, 16, Math.PI), archMat);
+          arch.position.set(side * 1.0, 1.0, 0);
+          group.add(arch);
+        }
+        const base = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 0.5), this._material(0xcccccc));
+        base.position.y = 0.0;
+        group.add(base);
+        break;
+      }
+      case 'shop': {
+        const wallMat = this._material(0xeeeeee);
+        const building = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 2), wallMat);
+        building.position.y = 1.0;
+        group.add(building);
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 0.1), this._material(0xffdd00));
+        sign.position.set(0, 2.2, 0.95);
+        group.add(sign);
+        break;
+      }
+      case 'inn': {
+        const wallMat = this._material(0xdda0dd);
+        const building = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 2), wallMat);
+        building.position.y = 1.25;
+        group.add(building);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.0, 4), this._material(0x8b4513));
+        roof.position.y = 3.0;
+        roof.rotation.y = Math.PI / 4;
+        group.add(roof);
+        break;
+      }
+      case 'castle_wall': {
+        const wallMat = this._material(0xaaaaaa);
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(5, 4, 0.5), wallMat);
+        wall.position.y = 2.0;
+        group.add(wall);
+        // Battlements
+        for (let i = -2; i <= 2; i++) {
+          const battlement = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.6), wallMat);
+          battlement.position.set(i * 1.0, 4.25, 0);
+          group.add(battlement);
+        }
+        break;
+      }
+      case 'castle_tower': {
+        const towerMat = this._material(0xbbbbbb);
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 6, 12), towerMat);
+        tower.position.y = 3.0;
+        group.add(tower);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 2.0, 12), this._material(0x8b0000));
+        roof.position.y = 7.0;
+        group.add(roof);
+        break;
+      }
+      case 'cactus': {
+        const cactusMat = this._material(0x2a8a2a);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 3, 8), cactusMat);
+        trunk.position.y = 1.5;
+        group.add(trunk);
+        for (const side of [-1, 1]) {
+          const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.5, 8), cactusMat);
+          arm.position.set(side * 0.7, 1.8, 0);
+          arm.rotation.z = side * Math.PI / 4;
+          group.add(arm);
+        }
+        break;
+      }
+      case 'tube': {
+        const tubeMat = this._material(0xff6644);
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 3, 12), tubeMat);
+        tube.rotation.z = Math.PI / 2;
+        group.add(tube);
+        break;
+      }
+      default: {
+        const box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), this._material(0x888888));
+        box.position.y = 1.0;
+        group.add(box);
+        break;
+      }
+    }
+
+    group.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return group;
+  }
+
+  // === Treasure Chest ===
+  createTreasureChest() {
+    const group = new THREE.Group();
+    const woodMat = this._material(0x8b4513);
+    const goldMat = this._material(0xffd700);
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.7), woodMat);
+    body.position.y = 0.3;
+    group.add(body);
+
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 0.7), woodMat);
+    lid.position.y = 0.75;
+    group.add(lid);
+
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.1), goldMat);
+    lock.position.set(0, 0.5, 0.4);
+    group.add(lock);
+
+    group.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    group.userData.isTreasure = true;
+    return group;
+  }
+
+  // === Save Point ===
+  createSavePoint() {
+    const group = new THREE.Group();
+    const crystalMat = this._material(0x44ffff);
+
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), crystalMat);
+    crystal.position.y = 1.0;
+    group.add(crystal);
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.3, 8), this._material(0x444444));
+    base.position.y = 0.15;
+    group.add(base);
+
+    group.userData.isSavePoint = true;
+    return group;
+  }
+
+  // === NPC Mesh ===
+  createNPCMesh(npcName) {
+    const group = new THREE.Group();
+    // Simple humanoid
+    const bodyMat = this._material(0x4488cc);
+    const headMat = this._material(0xffccaa);
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.4, 8), bodyMat);
+    body.position.y = 0.7;
+    group.add(body);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), headMat);
+    head.position.y = 1.6;
+    group.add(head);
+
+    // Name tag
+    group.userData.npcName = npcName;
+    group.userData.isNPC = true;
+
+    group.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return group;
+  }
+
+  // === Particle Effects ===
+  updateParticleEffect(points, dt) {
+    if (!points.userData.velocities) return;
+
+    const positions = points.geometry.attributes.position;
+    const velocities = points.userData.velocities;
+    const lifetimes = points.userData.lifetimes;
+    const maxLifetimes = points.userData.maxLifetimes;
+    points.userData.elapsed += dt;
+
+    let allDead = true;
+
+    for (let i = 0; i < velocities.length; i++) {
+      if (lifetimes[i] <= 0) continue;
+      allDead = false;
+
+      lifetimes[i] -= dt;
+
+      positions.setX(i, positions.getX(i) + velocities[i].x * dt);
+      positions.setY(i, positions.getY(i) + velocities[i].y * dt);
+      positions.setZ(i, positions.getZ(i) + velocities[i].z * dt);
+
+      velocities[i].y -= 2.0 * dt;
+
+      const alpha = clamp(lifetimes[i] / maxLifetimes[i], 0, 1);
+      points.material.opacity = alpha * 0.0;
+    }
+
+    positions.needsUpdate = true;
+
+    if (allDead) {
+      points.userData.dead = true;
+    }
+  }
 }
