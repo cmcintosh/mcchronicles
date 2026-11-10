@@ -103,7 +103,8 @@ export default class MusicEngine {
         this._setAdaptiveLayers(0);
       }
     } catch (e) {
-      console.error(`[MusicEngine] Error playing track ${trackId}:`, e);
+      // Non-critical: music will retry on next track change
+      console.debug(`[MusicEngine] Could not play track ${trackId}: ${e.name}`);
     }
   }
 
