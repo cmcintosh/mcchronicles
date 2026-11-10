@@ -10,8 +10,10 @@ export default class PartyMember extends BattleEntity {
   /**
    * @param {string} characterId — key into CHARACTERS
    * @param {number} level — starting level
+   * @param {number} [currentHp] — optional starting HP (defaults to max)
+   * @param {number} [currentMp] — optional starting MP (defaults to max)
    */
-  constructor(characterId, level = 1) {
+  constructor(characterId, level = 1, currentHp, currentMp) {
     const character = CHARACTERS[characterId];
     if (!character) {
       throw new Error(`Unknown character: ${characterId}`);
@@ -54,6 +56,16 @@ export default class PartyMember extends BattleEntity {
 
     // Create placeholder mesh
     this._createMesh();
+
+    // Override HP/MP if provided (for carrying battle damage between fights)
+    if (currentHp !== undefined && currentHp !== null) {
+      this.hp = Math.max(0, Math.min(currentHp, this.maxHp));
+    }
+    if (currentMp !== undefined && currentMp !== null) {
+      this.mp = Math.max(0, Math.min(currentMp, this.maxMp));
+    }
+    // Update alive status based on HP
+    this._alive = this.hp > 0;
   }
 
   /**
@@ -249,7 +261,7 @@ export default class PartyMember extends BattleEntity {
     this.equippedWeapon = data.equippedWeapon || null;
     this.equippedArmor = data.equippedArmor || null;
     this.equippedAccessory = data.equippedAccessory || null;
-    this.isAlive = this.hp > 0;
+    this._alive = this.hp > 0;
   }
 
   /**

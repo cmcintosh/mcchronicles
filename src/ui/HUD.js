@@ -672,6 +672,48 @@ export default class HUD {
     this._isVisible = false;
   }
 
+  /**
+   * Show a brief notification toast (e.g. "Auto-saved!").
+   * @param {string} text
+   * @param {number} [duration=2000] — ms
+   */
+  showNotification(text, duration = 2000) {
+    const toast = document.createElement('div');
+    toast.className = 'mc-hud-notification';
+    toast.textContent = text;
+    toast.style.cssText = `
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(26, 26, 46, 0.9);
+      border: 1px solid #d4af37;
+      border-radius: 6px;
+      padding: 8px 20px;
+      color: #d4af37;
+      font-family: 'Cinzel', 'Trajan Pro', 'Times New Roman', Georgia, serif;
+      font-size: 14px;
+      z-index: 300;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    `;
+    this._container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+    });
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.parentElement.removeChild(toast);
+        }
+      }, 300);
+    }, duration);
+  }
+
   destroy() {
     if (this._controlsFadeTimer) {
       clearTimeout(this._controlsFadeTimer);

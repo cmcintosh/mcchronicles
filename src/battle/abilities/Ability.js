@@ -62,16 +62,22 @@ export default class Ability {
 
   /**
    * damage = user.atk * power * elementMultiplier - target.def * 0.5  (min 1)
+   * Magical elements use user.mag instead of user.atk.
    */
   calculateDamage(user, target) {
-    const atk = user.getStatWithMods('atk');
+    // Magical elements scale with mag; physical elements scale with atk
+    const MAGICAL_ELEMENTS = ['fire', 'ice', 'holy', 'dark', 'fry'];
+    const isMagical = MAGICAL_ELEMENTS.includes(this.element);
+    const attackStat = isMagical
+      ? user.getStatWithMods('mag')
+      : user.getStatWithMods('atk');
     const def = target.getStatWithMods('def');
     const elementMultiplier = this.applyElementMultiplier(
       1,
       this.element,
       target,
     );
-    const raw = atk * this.power * elementMultiplier - def * 0.5;
+    const raw = attackStat * this.power * elementMultiplier - def * 0.5;
     return Math.max(1, Math.floor(raw));
   }
 
@@ -88,39 +94,15 @@ export default class Ability {
   // ──────────────────────────────────────────────
 
   /**
-   * Push status-effect objects onto the target's activeStatuses array.
-   * Each entry references the STATUS_EFFECTS template and carries an
-   * remainingTurns counter initialised from the template duration.
+   * Apply status effects to the target using the entity's applyStatus method.
+   * @param {BattleEntity} target
+   * @param {string[]} statusIds
    */
   applyStatus(target, statusIds) {
-    if (!target.activeStatuses) target.activeStatuses = [];
-
     for (const id of statusIds) {
-      const template = STATUS_EFFECTS[id];
-      if (!template) continue;
-
-      // Don't stack the same status — refresh duration instead
-      const existing = target.activeStatuses.find((s) => s.id === id);
-      if (existing) {
-        existing.remainingTurns = template.duration;
-        continue;
+      if (target.applyStatus) {
+        target.applyStatus(id);
       }
-
-      target.activeStatuses.push({
-        id,
-        name: template.name,
-        color: template.color,
-        remainingTurns: template.duration,
-        statMod: template.statMod || null,
-        tickDamage: template.tickDamage || 0,
-        tickHeal: template.tickHeal || 0,
-        tickMP: template.tickMP || 0,
-        skipTurn: template.skipTurn || false,
-        wakeOnDamage: template.wakeOnDamage || false,
-        forcesTarget: template.forcesTarget || false,
-        redirectsDamage: template.redirectsDamage || false,
-        atbMultiplier: template.atbMultiplier || 1,
-      });
     }
   }
 
@@ -154,8 +136,12 @@ export default class Ability {
   // ──────────────────────────────────────────────
 
   /**
-   * Delegates to battleSystem.addParticleEffect (or createParticleEffect).
-   * Falls back gracefully if the battle system doesn't expose either method.
+   * Delegates to battleSystem.addParticleEffect.
+   * @param {BattleSystem} battleSystem
+   * @param {string} type
+   * @param {THREE.Vector3} position
+   * @param {number} color
+   * @param {number} count
    */
   createParticleEffect(battleSystem, type, position, color, count = 10) {
     if (!battleSystem) return;
@@ -164,12 +150,8 @@ export default class Ability {
       ? (position.clone ? position.clone() : new THREE.Vector3(position.x, position.y, position.z))
       : new THREE.Vector3(0, 0, 0);
 
-    const effectData = { type, position: pos, color, count };
-
     if (typeof battleSystem.addParticleEffect === 'function') {
-      battleSystem.addParticleEffect(effectData);
-    } else if (typeof battleSystem.createParticleEffect === 'function') {
-      battleSystem.createParticleEffect(type, pos, color, count);
+      battleSystem.addParticleEffect(type, pos, color, count);
     }
   }
 }

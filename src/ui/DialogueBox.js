@@ -402,13 +402,30 @@ export default class DialogueBox {
 
     if (this._voiceMuted || !this._voicePrefix) return;
 
-    const audioUrl = `${this._voicePrefix}_${lineIndex}.mp3`;
+    // Get the speaker name for this line to construct the correct filename
+    // Voice files are named: {beat_id}_{lineIndex}_{speaker_lowercase}.mp3
+    const entry = this._dialogueQueue[lineIndex];
+    const speaker = entry ? (entry.speaker || 'narrator') : 'narrator';
+    const speakerSlug = speaker.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const audioUrl = `${this._voicePrefix}_${lineIndex}_${speakerSlug}.mp3`;
 
     // Try to play the voice file
     const audio = new Audio(audioUrl);
     audio.onerror = () => {
-      // Voice file not found — silently ignore
-      this._currentAudio = null;
+      // Voice file not found — try fallback without speaker name
+      const fallbackUrl = `${this._voicePrefix}_${lineIndex}.mp3`;
+      const fallbackAudio = new Audio(fallbackUrl);
+      fallbackAudio.onerror = () => {
+        this._currentAudio = null;
+      };
+      fallbackAudio.onended = () => {
+        this._currentAudio = null;
+      };
+      this._currentAudio = fallbackAudio;
+      fallbackAudio.play().catch(() => {
+        this._currentAudio = null;
+      });
     };
     audio.onended = () => {
       this._currentAudio = null;

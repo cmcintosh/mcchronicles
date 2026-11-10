@@ -2,6 +2,36 @@
 // Storybook-themed with golden borders, dark parchment backgrounds.
 
 import { clamp } from '../utils/math.js';
+import { ABILITIES } from '../data/abilities.js';
+
+// Helper: check if entity is alive (handles both property and method patterns)
+function isAlive(entity) {
+  if (!entity) return false;
+  if (typeof entity.isAlive === 'function') return entity.isAlive();
+  return !!entity.isAlive;
+}
+
+// Helper: get max HP (handles both property and method patterns)
+function getMaxHP(entity) {
+  if (typeof entity.getMaxHP === 'function') return entity.getMaxHP();
+  return entity.maxHP || entity.stats?.hp || 100;
+}
+
+// Helper: get max MP (handles both property and method patterns)
+function getMaxMP(entity) {
+  if (typeof entity.getMaxMP === 'function') return entity.getMaxMP();
+  return entity.maxMP || entity.stats?.mp || 50;
+}
+
+// Helper: get current HP (handles both property patterns)
+function getHP(entity) {
+  return entity.currentHP ?? entity.hp ?? 0;
+}
+
+// Helper: get current MP (handles both property patterns)
+function getMP(entity) {
+  return entity.currentMP ?? entity.mp ?? 0;
+}
 
 export default class BattleUI {
   /**
@@ -760,7 +790,7 @@ export default class BattleUI {
       if (activeEntity && member === activeEntity) {
         card.classList.add('active-turn');
       }
-      if (!member.isAlive()) {
+      if (!isAlive(member)) {
         card.classList.add('dead');
       }
 
@@ -771,11 +801,11 @@ export default class BattleUI {
       card.appendChild(nameRow);
 
       // HP bar
-      const hpBar = this._createBar(member.hp, member.getMaxHP(), 'hp', 'HP');
+      const hpBar = this._createBar(getHP(member), getMaxHP(member), 'hp', 'HP');
       card.appendChild(hpBar);
 
       // MP bar
-      const mpBar = this._createBar(member.mp, member.getMaxMP(), 'mp', 'MP');
+      const mpBar = this._createBar(getMP(member), getMaxMP(member), 'mp', 'MP');
       card.appendChild(mpBar);
 
       // ATB bar
@@ -785,12 +815,12 @@ export default class BattleUI {
       // Status effect icons
       const statusIcons = document.createElement('div');
       statusIcons.className = 'mc-status-icons';
-      if (member.statusEffects) {
-        for (const [statusId] of Object.entries(member.statusEffects)) {
+      if (member.statusEffects && Array.isArray(member.statusEffects)) {
+        for (const effect of member.statusEffects) {
           const icon = document.createElement('span');
           icon.className = 'mc-status-icon';
-          icon.textContent = this._getStatusIcon(statusId);
-          icon.title = statusId;
+          icon.textContent = this._getStatusIcon(effect.id);
+          icon.title = effect.name || effect.id;
           statusIcons.appendChild(icon);
         }
       }
@@ -821,7 +851,7 @@ export default class BattleUI {
       const nameEl = document.createElement('div');
       nameEl.className = 'mc-enemy-name';
       nameEl.textContent = enemy.name;
-      if (!enemy.isAlive()) {
+      if (!isAlive(enemy)) {
         nameEl.classList.add('dead');
       }
       info.appendChild(nameEl);
@@ -839,6 +869,7 @@ export default class BattleUI {
    * @param {BattleEntity} entity
    */
   showCommandMenu(entity) {
+    this._lastActiveEntity = entity;
     const menu = this.elements.commandMenu;
     menu.innerHTML = '';
 
@@ -868,6 +899,30 @@ export default class BattleUI {
       menu.appendChild(btn);
     }
 
+    // Battle speed toggle button
+    const speedBtn = document.createElement('button');
+    speedBtn.className = 'mc-cmd-btn mc-cmd-speed';
+    speedBtn.textContent = 'Speed: Normal';
+    speedBtn.addEventListener('click', () => {
+      if (this.callbacks.onToggleSpeed) {
+        const speed = this.callbacks.onToggleSpeed();
+        speedBtn.textContent = `Speed: ${speed === 'fast' ? 'Fast' : 'Normal'}`;
+      }
+    });
+    menu.appendChild(speedBtn);
+
+    // Auto-battle toggle button
+    const autoBtn = document.createElement('button');
+    autoBtn.className = 'mc-cmd-btn mc-cmd-auto';
+    autoBtn.textContent = 'Auto: OFF';
+    autoBtn.addEventListener('click', () => {
+      if (this.callbacks.onToggleAuto) {
+        const auto = this.callbacks.onToggleAuto();
+        autoBtn.textContent = `Auto: ${auto ? 'ON' : 'OFF'}`;
+      }
+    });
+    menu.appendChild(autoBtn);
+
     menu.classList.add('visible');
   }
 
@@ -893,7 +948,9 @@ export default class BattleUI {
     menu.appendChild(title);
 
     // Get abilities available to this character at their level
-    const abilities = entity.getAvailableAbilities ? entity.getAvailableAbilities() : [];
+    const abilities = entity.getAvailableAbilities
+      ? entity.getAvailableAbilities()
+      : (entity.abilities || []).map(id => ABILITIES[id]).filter(Boolean);
 
     if (abilities.length === 0) {
       const empty = document.createElement('div');
@@ -905,7 +962,7 @@ export default class BattleUI {
         const entry = document.createElement('div');
         entry.className = 'mc-ability-entry';
 
-        const canAfford = entity.mp >= abilityData.mpCost;
+        const canAfford = getMP(entity) >= abilityData.mpCost;
         if (!canAfford) {
           entry.classList.add('disabled');
         }
@@ -988,6 +1045,12 @@ export default class BattleUI {
         const entry = document.createElement('div');
         entry.className = 'mc-item-entry';
 
+        // Handle both formats: { itemId, data, quantity } and { id, name, count }
+        const itemId = item.itemId || item.id;
+        const itemName = item.data?.name || item.name || itemId;
+        const itemDesc = item.data?.description || item.description || '';
+        const itemQty = item.quantity ?? item.count ?? 0;
+
         const nameRow = document.createElement('div');
         nameRow.style.display = 'flex';
         nameRow.style.justifyContent = 'space-between';
@@ -995,11 +1058,11 @@ export default class BattleUI {
 
         const nameEl = document.createElement('span');
         nameEl.className = 'mc-item-name';
-        nameEl.textContent = item.data.name;
+        nameEl.textContent = itemName;
 
         const qtyEl = document.createElement('span');
         qtyEl.className = 'mc-item-qty';
-        qtyEl.textContent = `x${item.quantity}`;
+        qtyEl.textContent = `x${itemQty}`;
 
         nameRow.appendChild(nameEl);
         nameRow.appendChild(qtyEl);
@@ -1007,12 +1070,12 @@ export default class BattleUI {
 
         const descEl = document.createElement('div');
         descEl.className = 'mc-item-desc';
-        descEl.textContent = item.data.description || '';
+        descEl.textContent = itemDesc;
         entry.appendChild(descEl);
 
         entry.addEventListener('click', () => {
           if (this.callbacks.onSelectItem) {
-            this.callbacks.onSelectItem(item.itemId);
+            this.callbacks.onSelectItem(itemId);
           }
         });
 
@@ -1061,15 +1124,15 @@ export default class BattleUI {
       const entry = document.createElement('div');
       entry.className = 'mc-target-entry';
       if (!isEnemy) entry.classList.add('ally');
-      if (!target.isAlive()) entry.classList.add('dead');
+      if (!isAlive(target)) entry.classList.add('dead');
 
-      const hpInfo = target.isAlive()
-        ? ` (${target.hp}/${target.getMaxHP()} HP)`
+      const hpInfo = isAlive(target)
+        ? ` (${target.currentHP || target.hp}/${target.maxHP || target.stats?.hp || '?'} HP)`
         : ' (KO)';
 
       entry.textContent = target.name + hpInfo;
 
-      if (target.isAlive() || !isEnemy) {
+      if (isAlive(target) || !isEnemy) {
         entry.addEventListener('click', () => {
           if (this.callbacks.onSelectTarget) {
             this.callbacks.onSelectTarget(index);
@@ -1191,6 +1254,45 @@ export default class BattleUI {
    * Show a message in the battle log.
    * @param {string} text
    */
+  /**
+   * Show a floating damage/heal number above a target.
+   * @param {number} amount — damage or heal amount
+   * @param {boolean} isHeal — if true, show green; else red
+   * @param {number} [screenX] — optional screen X position (0-1)
+   * @param {number} [screenY] — optional screen Y position (0-1)
+   */
+  showDamageNumber(amount, isHeal = false, screenX = 0.5, screenY = 0.5) {
+    const number = document.createElement('div');
+    number.className = isHeal ? 'mc-damage-number heal' : 'mc-damage-number';
+    number.textContent = isHeal ? `+${amount}` : `-${amount}`;
+    number.style.position = 'absolute';
+    number.style.left = `${screenX * 100}%`;
+    number.style.top = `${screenY * 100}%`;
+    number.style.color = isHeal ? '#44ff88' : '#ff4444';
+    number.style.fontSize = '24px';
+    number.style.fontWeight = 'bold';
+    number.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+    number.style.pointerEvents = 'none';
+    number.style.zIndex = '200';
+    number.style.transition = 'all 1s ease-out';
+    number.style.transform = 'translate(-50%, -50%)';
+
+    this.root.appendChild(number);
+
+    // Animate upward and fade
+    requestAnimationFrame(() => {
+      number.style.top = `${(screenY - 0.1) * 100}%`;
+      number.style.opacity = '0';
+    });
+
+    // Remove after animation
+    setTimeout(() => {
+      if (number.parentElement) {
+        number.parentElement.removeChild(number);
+      }
+    }, 1000);
+  }
+
   showMessage(text) {
     this._logMessages.push(text);
     if (this._logMessages.length > 4) {

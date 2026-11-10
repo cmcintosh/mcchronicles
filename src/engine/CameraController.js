@@ -37,9 +37,12 @@ export default class CameraController {
     this.currentLookAt = new THREE.Vector3();
 
     // --- Mode-specific configuration ---------------------------------------
-    this.overworldOffset = new THREE.Vector3(0, 8, 12);
+    this.overworldOffset = new THREE.Vector3(0, 6, 10);
     this.overworldFollowSpeed = 5.0;
     this.overworldYawSpeed = 2.5;       // radians per second when Q/E held
+    this.overworldSmoothing = 0.08;     // lerp factor for smooth follow
+    this.overworldBobAmplitude = 0.1;   // subtle vertical bob
+    this.overworldBobSpeed = 1.0;       // bob frequency multiplier
 
     // Battle mode
     this.battleCombatants = [];         // array of THREE.Vector3
@@ -56,7 +59,7 @@ export default class CameraController {
     // Title mode
     this.titleRadius = 20;
     this.titleHeight = 10;
-    this.titleOrbitSpeed = 0.25;        // radians per second
+    this.titleOrbitSpeed = 0.1;         // radians per second (slow orbit)
 
     // Region / fog reference
     this.regionData = null;
@@ -185,9 +188,10 @@ export default class CameraController {
         t
       );
     } else {
-      // Transition complete — smooth follow toward target
-      this.camera.position.lerp(this.targetPosition, clamp(this.overworldFollowSpeed * dt, 0, 1));
-      this.currentLookAt.lerp(this.targetLookAt, clamp(this.overworldFollowSpeed * dt, 0, 1));
+      // Transition complete — smooth follow toward target with lerp smoothing
+      const smoothing = this.currentMode === 'overworld' ? this.overworldSmoothing : clamp(this.overworldFollowSpeed * dt, 0, 1);
+      this.camera.position.lerp(this.targetPosition, smoothing);
+      this.currentLookAt.lerp(this.targetLookAt, smoothing);
     }
 
     this.camera.lookAt(this.currentLookAt);
@@ -244,14 +248,16 @@ export default class CameraController {
     const offsetZ = this.overworldOffset.x * sinY + this.overworldOffset.z * cosY;
     const offsetY = this.overworldOffset.y;
 
+    // Subtle vertical bob for "alive" feel
+    const bobY = Math.sin(performance.now() * 0.001 * this.overworldBobSpeed) * this.overworldBobAmplitude;
+
     this.targetPosition.set(
       playerPos.x + offsetX,
-      playerPos.y + offsetY,
+      playerPos.y + offsetY + bobY,
       playerPos.z + offsetZ
     );
 
-    // Smoothly rotate the yaw component for lookAt alignment
-    // The lookAt target is the player's position (slightly above feet)
+    // Look at the player's position (slightly above feet)
     this.targetLookAt.set(
       playerPos.x,
       playerPos.y + 1.0,

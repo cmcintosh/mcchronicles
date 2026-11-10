@@ -4,7 +4,15 @@
 const STYLE_ID = 'mc-title-screen-styles';
 
 const TITLE_STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
 @keyframes mc-title-gradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes mc-title-gold-gradient {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
@@ -76,15 +84,20 @@ const TITLE_STYLES = `
 }
 
 .mc-title-main {
-  font-size: clamp(2.5rem, 8vw, 6rem);
+  font-family: 'Press Start 2P', Georgia, serif;
+  font-size: clamp(2rem, 6vw, 4.5rem);
   font-weight: bold;
-  color: #ffd700;
-  text-shadow: 3px 3px 6px rgba(120,0,0,0.8), 0 0 30px rgba(255,180,40,0.4);
-  animation: mc-title-glow 3s ease-in-out infinite, mc-title-fade-in 1.5s ease-out;
+  background: linear-gradient(135deg, #ffd700, #ffaa22, #ffe680, #ffcc44, #ffd700);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: mc-title-gold-gradient 3s ease infinite, mc-title-fade-in 1.5s ease-out;
   letter-spacing: 0.05em;
   margin: 0;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.3;
+  filter: drop-shadow(3px 3px 6px rgba(120,0,0,0.8)) drop-shadow(0 0 30px rgba(255,180,40,0.4));
 }
 
 .mc-title-subtitle {
@@ -117,16 +130,16 @@ const TITLE_STYLES = `
 }
 
 .mc-title-btn {
-  font-family: Georgia, serif;
-  font-size: 1.25rem;
-  padding: 0.8rem 2rem;
+  font-family: 'Press Start 2P', Georgia, serif;
+  font-size: 0.85rem;
+  padding: 0.9rem 1.5rem;
   background: linear-gradient(135deg, rgba(60,30,10,0.9), rgba(80,40,15,0.9));
   color: #ffd700;
   border: 2px solid;
   border-image: linear-gradient(135deg, #ffd700, #cc8800, #ffd700) 1;
   border-radius: 6px;
   cursor: pointer;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   transition: all 0.3s ease;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
   position: relative;
@@ -434,6 +447,12 @@ export default class TitleScreen {
     this._settingsBtn.addEventListener('click', () => this._showSettingsPanel());
     btnContainer.appendChild(this._settingsBtn);
 
+    this._creditsBtn = document.createElement('button');
+    this._creditsBtn.className = 'mc-title-btn';
+    this._creditsBtn.textContent = 'Credits';
+    this._creditsBtn.addEventListener('click', () => this._showCredits());
+    btnContainer.appendChild(this._creditsBtn);
+
     content.appendChild(btnContainer);
     this._container.appendChild(content);
 
@@ -603,6 +622,54 @@ export default class TitleScreen {
   _hideAllPanels() {
     this._settingsPanel.classList.remove('visible');
     this._savesPanel.classList.remove('visible');
+    if (this._creditsPanel) this._creditsPanel.classList.remove('visible');
+  }
+
+  _showCredits() {
+    this._hideAllPanels();
+    if (!this._creditsPanel) {
+      this._creditsPanel = document.createElement('div');
+      this._creditsPanel.className = 'mc-title-settings-panel';
+
+      const title = document.createElement('h2');
+      title.className = 'mc-panel-title';
+      title.textContent = 'Credits';
+      this._creditsPanel.appendChild(title);
+
+      const credits = [
+        { role: 'Game Director', name: 'Chris McIntosh' },
+        { role: 'Lead Developer', name: 'The OpenClaw Team' },
+        { role: 'Engine', name: 'Three.js · WebGL' },
+        { role: 'Inspiration', name: 'Ni no Kuni · Dragon Quest · McDonald\'s' },
+        { role: 'Special Thanks', name: 'To everyone who believes in the power of fries' },
+      ];
+
+      credits.forEach(({ role, name }) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'text-align: center; padding: 0.5rem 0; color: #ccaa66;';
+
+        const roleEl = document.createElement('div');
+        roleEl.style.cssText = 'font-family: Press Start 2P, Georgia, serif; font-size: 0.65rem; color: #ffd700; margin-bottom: 0.3rem;';
+        roleEl.textContent = role;
+        row.appendChild(roleEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.style.cssText = 'font-family: Georgia, serif; font-size: 0.95rem; font-style: italic;';
+        nameEl.textContent = name;
+        row.appendChild(nameEl);
+
+        this._creditsPanel.appendChild(row);
+      });
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'mc-panel-close';
+      closeBtn.textContent = '← Back';
+      closeBtn.addEventListener('click', () => this._hideAllPanels());
+      this._creditsPanel.appendChild(closeBtn);
+
+      this._container.appendChild(this._creditsPanel);
+    }
+    this._creditsPanel.classList.add('visible');
   }
 
   _handleSelect(action) {

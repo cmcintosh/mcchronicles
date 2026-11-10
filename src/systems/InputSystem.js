@@ -104,6 +104,70 @@ export default class InputSystem {
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup', this._onKeyUp);
     window.addEventListener('blur', this._onBlur);
+
+    // --- Touch controls (mobile) -----------------------------------------
+    this._touchActive = false;
+    this._touchStartX = 0;
+    this._touchStartY = 0;
+    this._touchCurrentX = 0;
+    this._touchCurrentY = 0;
+    this._touchJoystick = null;
+
+    this._onTouchStart = (e) => {
+      if (e.touches.length > 0) {
+        this._touchActive = true;
+        this._touchStartX = e.touches[0].clientX;
+        this._touchStartY = e.touches[0].clientY;
+        this._touchCurrentX = this._touchStartX;
+        this._touchCurrentY = this._touchStartY;
+
+        // Create virtual joystick visual
+        if (!this._touchJoystick) {
+          this._touchJoystick = document.createElement('div');
+          this._touchJoystick.style.cssText = `
+            position: fixed;
+            width: 120px; height: 120px;
+            border: 2px solid rgba(212, 175, 55, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+          `;
+          document.body.appendChild(this._touchJoystick);
+        }
+        this._touchJoystick.style.display = 'block';
+        this._touchJoystick.style.left = `${this._touchStartX - 60}px`;
+        this._touchJoystick.style.top = `${this._touchStartY - 60}px`;
+      }
+    };
+
+    this._onTouchMove = (e) => {
+      if (this._touchActive && e.touches.length > 0) {
+        this._touchCurrentX = e.touches[0].clientX;
+        this._touchCurrentY = e.touches[0].clientY;
+      }
+    };
+
+    this._onTouchEnd = (e) => {
+      // Check for tap (short touch without much movement) = confirm action
+      const dx = this._touchCurrentX - this._touchStartX;
+      const dy = this._touchCurrentY - this._touchStartY;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 10) {
+        // Tap = confirm
+        this._justPressed.add('Enter');
+        this._rawKeyDown.add('Enter');
+        setTimeout(() => this._rawKeyDown.delete('Enter'), 50);
+      }
+      this._touchActive = false;
+      if (this._touchJoystick) {
+        this._touchJoystick.style.display = 'none';
+      }
+    };
+
+    window.addEventListener('touchstart', this._onTouchStart, { passive: true });
+    window.addEventListener('touchmove', this._onTouchMove, { passive: true });
+    window.addEventListener('touchend', this._onTouchEnd, { passive: true });
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -256,6 +320,19 @@ export default class InputSystem {
       z += gy; // gamepad Y is down-positive, matching our z convention
     }
 
+    // --- Touch joystick --------------------------------------------------
+    if (this._touchActive) {
+      const tdx = this._touchCurrentX - this._touchStartX;
+      const tdy = this._touchCurrentY - this._touchStartY;
+      const tDist = Math.hypot(tdx, tdy);
+      const maxRadius = 60; // pixels
+      if (tDist > 5) {
+        const factor = Math.min(tDist / maxRadius, 1);
+        x += (tdx / tDist) * factor;
+        z += (tdy / tDist) * factor;
+      }
+    }
+
     // --- Normalize -------------------------------------------------------
     const len = Math.hypot(x, z);
     if (len > 1) {
@@ -274,6 +351,12 @@ export default class InputSystem {
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup', this._onKeyUp);
     window.removeEventListener('blur', this._onBlur);
+    window.removeEventListener('touchstart', this._onTouchStart);
+    window.removeEventListener('touchmove', this._onTouchMove);
+    window.removeEventListener('touchend', this._onTouchEnd);
+    if (this._touchJoystick && this._touchJoystick.parentElement) {
+      this._touchJoystick.parentElement.removeChild(this._touchJoystick);
+    }
     this._pressed.clear();
     this._justPressed.clear();
     this._justReleased.clear();

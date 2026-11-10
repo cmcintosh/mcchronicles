@@ -64,6 +64,12 @@ export default class BattleSystem {
 
     // Total rewards (accumulated on victory)
     this._pendingRewards = null;
+
+    // Battle speed: 'normal' or 'fast'
+    this.battleSpeed = 'normal';
+
+    // Auto-battle: when true, AI controls party members
+    this.autoBattle = false;
   }
 
   // ────────────────────────────────────────────────────────────
@@ -80,8 +86,8 @@ export default class BattleSystem {
     this.regionData = regionData || { id: 'plains', name: 'Battlefield' };
 
     // Create battle scene
-    this.battleScene = new BattleScene(regionData);
-    this.battleScene.init();
+    this.battleScene = new BattleScene();
+    this.battleScene.setupArena(regionData);
 
     // Create party members
     this.party = partyData.map((pd, idx) => {
@@ -112,12 +118,8 @@ export default class BattleSystem {
     });
 
     // Place entities in the scene
-    this.party.forEach((member, idx) => {
-      this.battleScene.addPartyMember(member, idx);
-    });
-    this.enemies.forEach((enemy, idx) => {
-      this.battleScene.addEnemy(enemy, idx);
-    });
+    this.battleScene.placeParty(this.party);
+    this.battleScene.placeEnemies(this.enemies);
 
     // Reset state
     this.turnQueue = [];
@@ -155,14 +157,27 @@ export default class BattleSystem {
       this._fillATB(dt);
     }
 
+    // Tick status effects on all entities (real-time DoT/HoT/regen)
+    const allEntities = [...this.party, ...this.enemies];
+    for (const entity of allEntities) {
+      if (entity.isAlive() && entity.update) {
+        entity.update(dt);
+      }
+    }
+
     // Process turn queue when idle
     if (this.battleState === 'idle') {
       if (!this.activeEntity && this.turnQueue.length > 0) {
         // Sort by agility (highest first), then by ATB fill time
-        this.turnQueue.sort((a, b) => b.getStat('agi') - a.getStat('agi'));
+        this.turnQueue.sort((a, b) => b.getStatWithMods('agi') - a.getStatWithMods('agi'));
         const entity = this.turnQueue.shift();
         this.startTurn(entity);
       }
+    }
+
+    // Auto-battle: AI controls party members
+    if (this.autoBattle && this.battleState === 'selecting' && this.activeEntity instanceof PartyMember) {
+      this._autoBattleAct(this.activeEntity);
     }
 
     // Handle animation state
@@ -197,8 +212,10 @@ export default class BattleSystem {
 
       // ATB fill rate: base 100 / (agi * 0.5 + 10) seconds to fill
       // Higher agility = faster ATB fill
-      const agi = entity.getStat('agi');
-      let fillRate = (agi * 0.5 + 10) / 100; // fraction per second
+      // Apply battle speed multiplier for faster gameplay
+      const speedMult = this.battleSpeed === 'fast' ? 2.0 : 1.0;
+      const agi = entity.getStatWithMods('agi');
+      let fillRate = (agi * 0.5 + 10) / 100 * speedMult; // fraction per second
 
       // Slow status halves fill rate
       if (entity.hasStatus('slow')) fillRate *= STATUS_EFFECTS.slow.atbMultiplier;
@@ -224,6 +241,17 @@ export default class BattleSystem {
    * @param {BattleEntity} entity
    */
   startTurn(entity) {
+    // Tick status effects (DoT, HoT, duration decrements)
+    this._tickEntityStatuses(entity);
+
+    // Check if entity died from DoT
+    if (!entity.isAlive()) {
+      entity.atb = 0;
+      this.battleState = 'idle';
+      if (this.battleUI) this.battleUI.update(this.party, this.enemies, null);
+      return;
+    }
+
     // Check for skip-turn status effects (freeze, stun, sleep)
     const skipStatuses = ['freeze', 'stun', 'sleep'];
     for (const status of skipStatuses) {
@@ -237,17 +265,6 @@ export default class BattleSystem {
         if (this.battleUI) this.battleUI.update(this.party, this.enemies, null);
         return;
       }
-    }
-
-    // Tick status effects (DoT, HoT, duration decrements)
-    this._tickEntityStatuses(entity);
-
-    // Check if entity died from DoT
-    if (!entity.isAlive()) {
-      entity.atb = 0;
-      this.battleState = 'idle';
-      if (this.battleUI) this.battleUI.update(this.party, this.enemies, null);
-      return;
     }
 
     this.activeEntity = entity;
@@ -269,47 +286,48 @@ export default class BattleSystem {
 
   /**
    * Tick status effects on an entity (DoT, HoT, duration).
+   * Works with the array-based statusEffects from BattleEntity.
    * @param {BattleEntity} entity
    * @private
    */
   _tickEntityStatuses(entity) {
-    if (!entity.statusEffects) return;
+    if (!entity.statusEffects || !Array.isArray(entity.statusEffects)) return;
 
     const toRemove = [];
 
-    for (const [statusId, data] of Object.entries(entity.statusEffects)) {
-      const effectDef = STATUS_EFFECTS[statusId];
+    for (const effect of entity.statusEffects) {
+      const effectDef = STATUS_EFFECTS[effect.id];
       if (!effectDef) continue;
 
-      // Tick damage (burn, poison)
+      // Tick damage (burn, poison) — per turn, not per second
       if (effectDef.tickDamage) {
-        const damage = Math.floor(entity.getMaxHP() * effectDef.tickDamage);
+        const damage = Math.max(1, Math.floor(entity.getMaxHP() * effectDef.tickDamage));
         entity.takeDamage(damage);
         this.showMessage(`${entity.name} takes ${damage} ${effectDef.name} damage.`);
       }
 
       // Tick heal (regen)
       if (effectDef.tickHeal) {
-        const heal = Math.floor(entity.getMaxHP() * effectDef.tickHeal);
+        const heal = Math.max(1, Math.floor(entity.getMaxHP() * effectDef.tickHeal));
         entity.heal(heal);
       }
 
       // Tick MP regen
       if (effectDef.tickMP) {
-        const mpRestore = Math.floor(entity.getMaxMP() * effectDef.tickMP);
+        const mpRestore = Math.max(1, Math.floor(entity.getMaxMP() * effectDef.tickMP));
         entity.restoreMP(mpRestore);
       }
 
-      // Decrement duration
-      data.duration--;
-      if (data.duration <= 0) {
-        toRemove.push(statusId);
+      // Decrement duration (turn-based)
+      effect.remaining -= 1;
+      if (effect.remaining <= 0) {
+        toRemove.push(effect.id);
         this.showMessage(`${effectDef.name} wore off on ${entity.name}.`);
       }
     }
 
     for (const statusId of toRemove) {
-      delete entity.statusEffects[statusId];
+      entity.removeStatus(statusId);
     }
   }
 
@@ -729,16 +747,14 @@ export default class BattleSystem {
       }
       case 'cure_status': {
         if (target.statusEffects) {
-          target.statusEffects = {};
+          target.statusEffects = [];
           this.showMessage(`${target.name}'s status ailments are cured!`);
         }
         break;
       }
       case 'buff_agi': {
-        if (target.statusEffects) {
-          target.statusEffects.agi_up = { duration: 3 };
-          this.showMessage(`${target.name}'s agility increased!`);
-        }
+        target.applyStatus('agi_up');
+        this.showMessage(`${target.name}'s agility increased!`);
         break;
       }
       default:
@@ -890,10 +906,12 @@ export default class BattleSystem {
     reserveMember.battleIndex = activeIdx;
     reserveMember.atb = 0;
 
-    // Update scene positions
+    // Update scene positions — remove old mesh, add new
     if (this.battleScene) {
-      this.battleScene.removePartyMember(activeIdx);
-      this.battleScene.addPartyMember(reserveMember, activeIdx);
+      if (activeMember.mesh && activeMember.mesh.parent) {
+        activeMember.mesh.parent.remove(activeMember.mesh);
+      }
+      this.battleScene.placeParty(this.party);
     }
 
     if (this.battleUI) {
@@ -917,9 +935,9 @@ export default class BattleSystem {
 
     if (aliveParty.length === 0) return;
 
-    const avgPartyAgi = aliveParty.reduce((sum, p) => sum + p.getStat('agi'), 0) / aliveParty.length;
+    const avgPartyAgi = aliveParty.reduce((sum, p) => sum + p.getStatWithMods('agi'), 0) / aliveParty.length;
     const avgEnemyAgi = aliveEnemies.length > 0
-      ? aliveEnemies.reduce((sum, e) => sum + e.getStat('agi'), 0) / aliveEnemies.length
+      ? aliveEnemies.reduce((sum, e) => sum + e.getStatWithMods('agi'), 0) / aliveEnemies.length
       : 10;
 
     // Flee chance: base 50% + 2% per agi difference, clamped 10%-90%
@@ -968,25 +986,47 @@ export default class BattleSystem {
 
   /**
    * Add a particle effect to the scene.
-   * @param {string} type — 'burst', 'heal', 'slash', etc.
-   * @param {THREE.Vector3} position
-   * @param {number} color — hex color
-   * @param {number} count — particle count
+   * Accepts either (type, position, color, count) or a single object.
+   * @param {string|object} type — 'burst', 'heal', 'slash', etc. or effect data object
+   * @param {THREE.Vector3} [position]
+   * @param {number} [color] — hex color
+   * @param {number} [count] — particle count
    */
   addParticleEffect(type, position, color, count) {
-    if (this.battleScene) {
-      this.battleScene.addParticleEffect(type, position, color, count);
+    if (!this.battleScene) return;
+
+    // Handle single-object signature
+    if (typeof type === 'object' && type !== null) {
+      const data = type;
+      type = data.type;
+      position = data.position;
+      color = data.color;
+      count = data.count;
+    }
+
+    if (!position) position = new THREE.Vector3(0, 1, 0);
+    if (color === undefined) color = 0xffaa00;
+    if (count === undefined) count = 12;
+
+    // Delegate to BattleScene.addParticleBurst
+    if (this.battleScene.addParticleBurst) {
+      this.battleScene.addParticleBurst(position, color, count);
     }
   }
 
   /**
    * Add a visual effect mesh to the scene.
-   * @param {THREE.Mesh} mesh
-   * @param {number} duration — seconds
+   * @param {THREE.Object3D|object} mesh — effect mesh or effect data
+   * @param {number} [duration] — seconds
    */
   addEffect(mesh, duration) {
     if (this.battleScene) {
-      this.battleScene.addEffect(mesh, duration);
+      // If mesh is an object with type property (effect data), skip visual
+      // (visual effects are handled by BattleScene particle methods)
+      if (mesh && typeof mesh === 'object' && mesh.type && !mesh.isObject3D) {
+        return;
+      }
+      this.battleScene.addEffect(mesh, duration || 1.0);
     }
   }
 
@@ -1049,7 +1089,73 @@ export default class BattleSystem {
       onSelectTarget: (index) => this.selectTarget(index),
       onSelectItem: (itemId) => this.selectItem(itemId),
       onFlee: () => this.flee(),
+      onToggleSpeed: () => this.toggleBattleSpeed(),
+      onToggleAuto: () => this.toggleAutoBattle(),
     };
+  }
+
+  // ────────────────────────────────────────────────────────────
+  //  Auto-Battle & Speed Toggle
+  // ────────────────────────────────────────────────────────────
+
+  /**
+   * Toggle between normal and fast battle speed.
+   */
+  toggleBattleSpeed() {
+    this.battleSpeed = this.battleSpeed === 'normal' ? 'fast' : 'normal';
+    if (this.battleUI) {
+      this.battleUI.showMessage(this.battleSpeed === 'fast' ? 'Battle Speed: Fast' : 'Battle Speed: Normal');
+    }
+    return this.battleSpeed;
+  }
+
+  /**
+   * Toggle auto-battle on/off.
+   */
+  toggleAutoBattle() {
+    this.autoBattle = !this.autoBattle;
+    if (this.battleUI) {
+      this.battleUI.showMessage(this.autoBattle ? 'Auto-Battle: ON' : 'Auto-Battle: OFF');
+    }
+    return this.autoBattle;
+  }
+
+  /**
+   * AI-controlled action for a party member (auto-battle).
+   * @param {PartyMember} entity
+   * @private
+   */
+  _autoBattleAct(entity) {
+    const aliveEnemies = this.enemies.filter((e) => e.isAlive());
+    if (aliveEnemies.length === 0) return;
+
+    // Simple AI: use strongest available ability if MP > 50%, else basic attack
+    const abilities = entity.getAvailableAbilityObjects();
+    const attackAbilities = abilities.filter((a) => a.type === 'attack' || a.type === 'aoe');
+
+    if (attackAbilities.length > 0 && entity.mp > attackAbilities[0].mpCost) {
+      // Use strongest attack ability
+      const ability = attackAbilities.reduce((best, a) =>
+        (a.power || 0) > (best.power || 0) ? a : best
+      );
+      this.selectAbility(ability.id);
+      // Auto-select first alive enemy target
+      setTimeout(() => {
+        if (this.battleState === 'targeting') {
+          const targetIdx = this.enemies.findIndex((e) => e.isAlive());
+          if (targetIdx >= 0) this.selectTarget(targetIdx);
+        }
+      }, 50);
+    } else {
+      // Basic attack
+      this.selectCommand('attack');
+      setTimeout(() => {
+        if (this.battleState === 'targeting') {
+          const targetIdx = this.enemies.findIndex((e) => e.isAlive());
+          if (targetIdx >= 0) this.selectTarget(targetIdx);
+        }
+      }, 50);
+    }
   }
 
   // ────────────────────────────────────────────────────────────
@@ -1082,6 +1188,8 @@ export default class BattleSystem {
     this._animationTimer = 0;
     this._animationDuration = 0;
     this.battleState = 'idle';
+    this.battleSpeed = 'normal';
+    this.autoBattle = false;
   }
 }
 

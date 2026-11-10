@@ -9,18 +9,19 @@ import { randomChoice, randomChance } from '../utils/math.js';
 export default class Enemy extends BattleEntity {
   /**
    * @param {string} monsterId — key into MONSTERS
-   * @param {number} [levelScale=1] — multiplier for stats
+   * @param {number} [level=1] — enemy level for stat scaling
    */
-  constructor(monsterId, levelScale = 1) {
+  constructor(monsterId, level = 1) {
     const monster = MONSTERS[monsterId];
     if (!monster) {
       throw new Error(`Unknown monster: ${monsterId}`);
     }
 
-    // Apply level scaling to stats
+    // Apply level scaling to stats — gentle curve: +15% per level above 1
+    const scale = 1 + 0.15 * (level - 1);
     const scaledStats = {};
     for (const [key, val] of Object.entries(monster.stats)) {
-      scaledStats[key] = Math.round(val * levelScale);
+      scaledStats[key] = Math.round(val * scale);
     }
 
     super({
@@ -38,7 +39,7 @@ export default class Enemy extends BattleEntity {
 
     this.monsterId = monsterId;
     this.monster = monster;
-    this.levelScale = levelScale;
+    this.level = level;
     this.tier = monster.tier || 'normal';
     this.color = monster.color || 0x888888;
     this.size = monster.size || 1.0;
@@ -54,7 +55,7 @@ export default class Enemy extends BattleEntity {
     this.xpReward = monster.xp || 0;
     this.goldReward = monster.gold || 0;
 
-    this.isAlive = true;
+    this._alive = true;
 
     // Create placeholder mesh
     this._createMesh();
@@ -175,8 +176,8 @@ export default class Enemy extends BattleEntity {
    * @returns {{type: string, abilityId: string, targetIndex: number}|{type: string, abilityId: string, targets: number[]}}
    */
   chooseAction(party, enemies) {
-    const aliveParty = party.filter((p) => p.isAlive);
-    const aliveAllies = enemies.filter((e) => e.isAlive);
+    const aliveParty = party.filter((p) => p.isAlive());
+    const aliveAllies = enemies.filter((e) => e.isAlive());
 
     if (aliveParty.length === 0) {
       return { type: 'attack', abilityId: this.abilities[0] || 'enemy_bite', targetIndex: 0 };
@@ -319,7 +320,7 @@ export default class Enemy extends BattleEntity {
    * @returns {number}
    */
   getXPReward() {
-    return Math.round(this.xpReward * this.levelScale);
+    return Math.round(this.xpReward * (1 + 0.1 * (this.level - 1)));
   }
 
   /**
@@ -327,7 +328,7 @@ export default class Enemy extends BattleEntity {
    * @returns {number}
    */
   getGoldReward() {
-    return Math.round(this.goldReward * this.levelScale);
+    return Math.round(this.goldReward * (1 + 0.1 * (this.level - 1)));
   }
 
   /**

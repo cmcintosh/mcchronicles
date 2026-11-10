@@ -1,8 +1,12 @@
 // SceneManager — Manages active THREE.Scene and transitions between game states
 // States: title, overworld, battle, menu
+// Integrates PostProcessing, SkyDome, ParticleSystem, and per-region lighting
 
 import * as THREE from 'three';
 import { lerp, clamp, smoothstep } from '../utils/math.js';
+import { PostProcessing } from './PostProcessing.js';
+import { SkyDome } from './SkyDome.js';
+import { ParticleSystem } from './ParticleSystem.js';
 
 export class SceneManager {
   constructor(renderer, cameraController, assetManager) {
@@ -18,13 +22,20 @@ export class SceneManager {
       menu: new THREE.Scene(),
     };
 
-    // Fog for each scene
-    this.sceneFog = {};
+    // Post-processing pipeline
+    this.postProcessing = new PostProcessing(renderer, this.scenes.title, cameraController.camera);
+
+    // Sky dome
+    this.skyDome = new SkyDome();
+
+    // Particle system
+    this.particleSystem = new ParticleSystem();
+    this.currentParticles = null;
 
     // Transition state
     this.transitioning = false;
     this.transitionT = 0;
-    this.transitionDuration = 0.5; // seconds
+    this.transitionDuration = 0.5;
     this.transitionFromState = null;
     this.transitionToState = null;
     this.pendingData = null;
@@ -40,7 +51,6 @@ export class SceneManager {
     });
     this.overlay = new THREE.Mesh(this.overlayGeometry, this.overlayMaterial);
     this.overlay.position.z = -0.1;
-    // Overlay camera (separate from game camera)
     this.overlayScene = new THREE.Scene();
     this.overlayCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.overlayScene.add(this.overlay);
@@ -49,77 +59,46 @@ export class SceneManager {
     this.currentRegion = null;
     this.battleData = null;
 
-    // Background sky settings per scene
-    this.skySettings = {};
-
-    // Setup title scene with a basic environment
+    // Setup title scene
     this._setupTitleScene();
   }
 
   _setupTitleScene() {
     const scene = this.scenes.title;
-    // Increased ambient light for visibility
-    const ambient = new THREE.AmbientLight(0x8899bb, 1.2);
+
+    // Lighting — golden hour for title screen
+    const ambient = new THREE.AmbientLight(0x6688aa, 0.4);
+    ambient.userData.persistent = true;
     scene.add(ambient);
 
-    // Hemisphere light for better color balance
-    const hemi = new THREE.HemisphereLight(0xaaaaff, 0x443366, 0.6);
+    const hemi = new THREE.HemisphereLight(0x87CEEB, 0x665544, 0.6);
     hemi.position.set(0, 20, 0);
+    hemi.userData.persistent = true;
     scene.add(hemi);
 
-    // Directional light (key light)
-    const directional = new THREE.DirectionalLight(0xfff4dd, 1.5);
-    directional.position.set(-5, 10, -3);
+    const directional = new THREE.DirectionalLight(0xFFE5B4, 1.5);
+    directional.position.set(30, 40, 20);
     directional.castShadow = true;
-    directional.shadow.mapSize.width = 2048;
-    directional.shadow.mapSize.height = 2048;
+    directional.shadow.mapSize.set(4096, 4096);
+    directional.shadow.camera.near = 0.5;
+    directional.shadow.camera.far = 100;
+    directional.shadow.camera.left = -50;
+    directional.shadow.camera.right = 50;
+    directional.shadow.camera.top = 50;
+    directional.shadow.camera.bottom = -50;
+    directional.shadow.bias = -0.0005;
+    directional.shadow.normalBias = 0.02;
+    directional.userData.persistent = true;
     scene.add(directional);
 
-    // Fill light from opposite side
-    const fill = new THREE.DirectionalLight(0xffaadd, 0.5);
-    fill.position.set(5, 8, 3);
-    scene.add(fill);
-
-    // Warmer fog color
+    // Fog
     scene.fog = new THREE.FogExp2(0x2a1a3a, 0.015);
 
-    // Sky gradient background using a large sphere
-    const skyGeo = new THREE.SphereGeometry(200, 32, 16);
-    const skyMat = new THREE.ShaderMaterial({
-      uniforms: {
-        topColor: { value: new THREE.Color(0x4a3a6a) },
-        bottomColor: { value: new THREE.Color(0x6a4a5a) },
-        offset: { value: 33 },
-        exponent: { value: 0.6 },
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 bottomColor;
-        uniform float offset;
-        uniform float exponent;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition + offset).y;
-          gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
-        }
-      `,
-      side: THREE.BackSide,
-      depthWrite: false,
-    });
-    const sky = new THREE.Mesh(skyGeo, skyMat);
-    sky.userData.persistent = true;
-    scene.add(sky);
+    // Sky dome for title
+    this.skyDome.setRegion('fry_valley');
+    this.skyDome.addToScene(scene);
 
-    // Add some decorative objects for the title screen
-    // Ground plane — visible warm color
+    // Ground plane
     const groundMat = this.assetManager.shaderManager.createToonMaterial(0x5a4a3a);
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
@@ -130,10 +109,28 @@ export class SceneManager {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // A few golden arches in the distance
+    // A few decorative objects for the title screen
     const arches = this.assetManager.createStructure('golden_arches');
     arches.position.set(0, -2, -10);
     scene.add(arches);
+
+    // Add a few trees for atmosphere
+    for (let i = 0; i < 5; i++) {
+      const tree = this.assetManager.createTree('fry_valley');
+      const angle = (i / 5) * Math.PI * 2;
+      const dist = 15 + Math.random() * 5;
+      tree.position.x = Math.cos(angle) * dist;
+      tree.position.z = Math.sin(angle) * dist;
+      tree.position.y = -2;
+      scene.add(tree);
+    }
+
+    // Title screen pollen particles
+    const titleParticles = this.particleSystem.create('fry_valley', 100);
+    if (titleParticles) {
+      titleParticles.userData.persistent = true;
+      scene.add(titleParticles);
+    }
   }
 
   setState(state, data = {}) {
@@ -179,52 +176,92 @@ export class SceneManager {
     } else if (this.currentState === 'menu') {
       this.cameraController.setMode('menu');
     }
+
+    // Update post-processing to use current scene
+    const scene = this.scenes[this.currentState];
+    this.postProcessing.setScene(scene, this.cameraController.camera);
+    this.postProcessing.clearOutlines();
+
+    // Add character meshes to outline pass
+    this._collectOutlineObjects(scene);
+  }
+
+  /**
+   * Collect all character/monster meshes in the scene and add to outline pass
+   */
+  _collectOutlineObjects(scene) {
+    const outlineObjects = [];
+    scene.traverse(child => {
+      if (child.userData.type === 'character' ||
+          child.userData.type === 'monster' ||
+          child.userData.type === 'npc' ||
+          child.userData.isCharacter ||
+          child.userData.isMonster) {
+        outlineObjects.push(child);
+      }
+    });
+    if (outlineObjects.length > 0) {
+      this.postProcessing.addOutline(outlineObjects);
+    }
   }
 
   _setupOverworldScene(regionData) {
     const scene = this.scenes.overworld;
 
-    // Clear existing scene content (keep lights)
+    // Clear existing scene content
     const toRemove = [];
     scene.children.forEach(child => {
       if (!child.userData.persistent) toRemove.push(child);
     });
     toRemove.forEach(child => scene.remove(child));
 
-    // Ambient light — brighter
-    const ambient = new THREE.AmbientLight(regionData.ambientColor || 0x6677aa, 0.8);
+    // === Lighting Overhaul ===
+    // Ambient light — region ambient color
+    const ambient = new THREE.AmbientLight(regionData.ambientColor || 0x6677aa, 0.4);
     ambient.userData.persistent = true;
     scene.add(ambient);
 
-    // Hemisphere light for better color balance
-    const hemi = new THREE.HemisphereLight(0xaaaaff, 0x665544, 0.5);
+    // Hemisphere light — sky top color, ground color
+    const hemi = new THREE.HemisphereLight(
+      regionData.skyTop || 0x87CEEB,
+      regionData.groundColor || 0x665544,
+      0.6
+    );
     hemi.position.set(0, 20, 0);
     hemi.userData.persistent = true;
     scene.add(hemi);
 
-    // Directional light
-    const directional = new THREE.DirectionalLight(regionData.lightColor || 0xfff4dd, 1.3);
-    directional.position.set(-5, 10, -3);
+    // Directional light — warm golden
+    const directional = new THREE.DirectionalLight(0xFFE5B4, 1.5);
+    directional.position.set(30, 40, 20);
     directional.castShadow = true;
-    directional.shadow.mapSize.width = 2048;
-    directional.shadow.mapSize.height = 2048;
+    directional.shadow.mapSize.set(4096, 4096);
     directional.shadow.camera.near = 0.5;
-    directional.shadow.camera.far = 50;
-    directional.shadow.camera.left = -40;
-    directional.shadow.camera.right = 40;
-    directional.shadow.camera.top = 40;
-    directional.shadow.camera.bottom = -40;
+    directional.shadow.camera.far = 100;
+    directional.shadow.camera.left = -50;
+    directional.shadow.camera.right = 50;
+    directional.shadow.camera.top = 50;
+    directional.shadow.camera.bottom = -50;
+    directional.shadow.bias = -0.0005;
+    directional.shadow.normalBias = 0.02;
     directional.userData.persistent = true;
     scene.add(directional);
 
-    // Fog
-    scene.fog = new THREE.FogExp2(regionData.fogColor || 0x88aacc, regionData.fogDensity || 0.02);
+    // Fog — FogExp2 with per-region color and density
+    scene.fog = new THREE.FogExp2(
+      regionData.fogColor || 0x88aacc,
+      regionData.fogDensity || 0.015
+    );
 
-    // Ground
+    // === Sky Dome ===
+    this.skyDome.setRegion(regionData.id);
+    this.skyDome.addToScene(scene);
+
+    // === Ground ===
     const ground = this.assetManager.createGround(regionData);
     scene.add(ground);
 
-    // Decorations — trees
+    // === Decorations ===
     if (regionData.decorations) {
       const deco = regionData.decorations;
       const treeCount = deco.trees || 0;
@@ -253,7 +290,6 @@ export class SceneManager {
 
       // Structures
       if (regionData.isHub) {
-        // Town structures
         const townStructures = ['shop', 'inn', 'house', 'house', 'golden_arches'];
         townStructures.forEach((type, i) => {
           const struct = this.assetManager.createStructure(type);
@@ -265,7 +301,6 @@ export class SceneManager {
           scene.add(struct);
         });
 
-        // Save point
         const savePoint = this.assetManager.createSavePoint();
         savePoint.position.set(0, 0, -10);
         scene.add(savePoint);
@@ -337,6 +372,13 @@ export class SceneManager {
       });
     }
 
+    // === Particle System ===
+    const particles = this.particleSystem.create(regionData.id, regionData.size || 80);
+    if (particles) {
+      this.currentParticles = particles;
+      scene.add(particles);
+    }
+
     // Set camera region
     this.cameraController.setRegion(regionData);
   }
@@ -349,14 +391,27 @@ export class SceneManager {
       scene.remove(scene.children[0]);
     }
 
-    // Lights — brighter for visibility
-    const ambient = new THREE.AmbientLight(0x6677aa, 0.7);
+    // Lighting
+    const ambient = new THREE.AmbientLight(0x6677aa, 0.4);
     scene.add(ambient);
-    const directional = new THREE.DirectionalLight(0xfff4dd, 1.5);
+
+    const hemi = new THREE.HemisphereLight(
+      this.currentRegion?.skyTop || 0x87CEEB,
+      this.currentRegion?.groundColor || 0x665544,
+      0.6
+    );
+    scene.add(hemi);
+
+    const directional = new THREE.DirectionalLight(0xFFE5B4, 1.5);
     directional.position.set(-5, 10, -3);
     directional.castShadow = true;
-    directional.shadow.mapSize.width = 1024;
-    directional.shadow.mapSize.height = 1024;
+    directional.shadow.mapSize.set(2048, 2048);
+    directional.shadow.camera.near = 0.5;
+    directional.shadow.camera.far = 50;
+    directional.shadow.camera.left = -20;
+    directional.shadow.camera.right = 20;
+    directional.shadow.camera.top = 20;
+    directional.shadow.camera.bottom = -20;
     scene.add(directional);
 
     // Battle arena — circular platform
@@ -371,7 +426,7 @@ export class SceneManager {
     arena.receiveShadow = true;
     scene.add(arena);
 
-    // Sky backdrop — gradient via fog
+    // Sky backdrop via fog
     scene.fog = new THREE.FogExp2(this.currentRegion?.fogColor || 0x88aacc, 0.03);
 
     // Background environment ring
@@ -386,10 +441,9 @@ export class SceneManager {
     ring.position.y = -0.24;
     scene.add(ring);
 
-    // Position combatants and set battle camera
+    // Position combatants
     const positions = [];
 
-    // Party positions (left side)
     if (battleData.party) {
       battleData.party.forEach((member, i) => {
         if (member.mesh) {
@@ -397,13 +451,13 @@ export class SceneManager {
           const z = 2 - i * 0.5;
           member.mesh.position.set(x, 0, z);
           member.mesh.lookAt(0, member.mesh.position.y, 0);
+          member.mesh.userData.isCharacter = true;
           scene.add(member.mesh);
           positions.push(new THREE.Vector3(x, 1, z));
         }
       });
     }
 
-    // Enemy positions (right side)
     if (battleData.enemies) {
       battleData.enemies.forEach((enemy, i) => {
         if (enemy.mesh) {
@@ -411,13 +465,13 @@ export class SceneManager {
           const z = 2 - i * 0.5;
           enemy.mesh.position.set(x, 0, z);
           enemy.mesh.lookAt(0, enemy.mesh.position.y, 0);
+          enemy.mesh.userData.isMonster = true;
           scene.add(enemy.mesh);
           positions.push(new THREE.Vector3(x, 1, z));
         }
       });
     }
 
-    // Set battle camera positions
     this.cameraController.setBattleCombatants(positions);
   }
 
@@ -429,7 +483,6 @@ export class SceneManager {
       scene.remove(scene.children[0]);
     }
 
-    // Simple dark background
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
       new THREE.MeshBasicMaterial({ color: 0x1a1a2e })
@@ -457,12 +510,9 @@ export class SceneManager {
       const t = clamp(this.transitionT, 0, 1);
 
       if (t < 0.5) {
-        // Fade to black
         this.overlayMaterial.opacity = smoothstep(0, 1, t * 2);
       } else {
-        // Fade from black
         this.overlayMaterial.opacity = smoothstep(1, 0, (t - 0.5) * 2);
-        // Switch scene at midpoint
         if (t >= 0.5 && this.currentState !== this.transitionToState) {
           this._completeTransition();
         }
@@ -473,11 +523,20 @@ export class SceneManager {
         this.overlayMaterial.opacity = 0;
       }
     }
+
+    // Update sky dome time
+    this.skyDome.update(performance.now() * 0.001);
+
+    // Update particles
+    if (this.currentParticles) {
+      this.particleSystem.update(this.currentParticles, dt);
+      this.particleSystem.updateTime(performance.now() * 0.001);
+    }
   }
 
   render() {
-    // Render the current scene
-    this.renderer.render(this.getScene(), this.getCamera());
+    // Use post-processing pipeline instead of direct render
+    this.postProcessing.render();
 
     // Render overlay on top for transitions
     if (this.overlayMaterial.opacity > 0) {
@@ -485,6 +544,27 @@ export class SceneManager {
       this.renderer.render(this.overlayScene, this.overlayCamera);
       this.renderer.autoClear = true;
     }
+  }
+
+  /**
+   * Handle window resize
+   */
+  onResize(width, height) {
+    this.postProcessing.setSize(width, height);
+  }
+
+  /**
+   * Add objects to outline pass
+   */
+  addOutline(objects) {
+    this.postProcessing.addOutline(objects);
+  }
+
+  /**
+   * Clear outline objects
+   */
+  clearOutlines() {
+    this.postProcessing.clearOutlines();
   }
 }
 

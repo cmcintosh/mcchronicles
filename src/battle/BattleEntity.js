@@ -25,12 +25,13 @@ export default class BattleEntity {
     this.mp = options.mp !== undefined ? options.mp : this.maxMp;
 
     // ATB system
-    this.atbGauge = 0;
+    this.atb = 0;
+    this.atbGauge = 0; // deprecated, kept for backward compat
     this.atbMultiplier = 1;
     this.isReady = false;
 
     // State
-    this.isAlive = true;
+    this._alive = true;
     this.isDefending = false;
 
     // Status effects array — each entry: { id, name, duration, statMod, tickDamage, tickHeal, tickMP, skipTurn, wakeOnDamage, atbMultiplier, ... }
@@ -46,29 +47,89 @@ export default class BattleEntity {
   }
 
   /**
-   * Per-frame update: fill ATB gauge, tick status effects, check readiness.
+   * Per-frame update: tick status effects, update visual effects.
+   * ATB filling is handled by BattleSystem._fillATB().
    * @param {number} dt — delta time in seconds
    */
   update(dt) {
-    if (!this.isAlive) return;
+    if (!this._alive) return;
 
     // Tick status effects
     this._tickStatusEffects(dt);
 
-    // Check if any status skips turn (freeze, sleep, stun)
-    const skipThisTurn = this.statusEffects.some((s) => s.skipTurn);
-
-    if (!skipThisTurn) {
-      // Fill ATB gauge
-      const speed = this.getATBSpeed();
-      this.atbGauge = clamp(this.atbGauge + speed * dt, 0, 100);
-    }
-
-    // Update readiness
-    this.isReady = this.atbGauge >= 100;
-
     // Update visual effects (flash, shake)
     this._updateVisualEffects(dt);
+  }
+
+  /**
+   * Check if this entity is alive.
+   * @returns {boolean}
+   */
+  isAlive() {
+    return this._alive;
+  }
+
+  /**
+   * Get maximum HP.
+   * @returns {number}
+   */
+  getMaxHP() {
+    return this.maxHp;
+  }
+
+  /**
+   * Get maximum MP.
+   * @returns {number}
+   */
+  getMaxMP() {
+    return this.maxMp;
+  }
+
+  /**
+   * Get a stat value (with status effect modifications).
+   * Alias for getStatWithMods.
+   * @param {string} key — stat key (atk, def, agi, mag)
+   * @returns {number}
+   */
+  getStat(key) {
+    return this.getStatWithMods(key);
+  }
+
+  /**
+   * Restore MP.
+   * @param {number} amount
+   * @returns {number} actual amount restored
+   */
+  restoreMP(amount) {
+    if (!this._alive) return 0;
+    const before = this.mp;
+    this.mp = clamp(this.mp + amount, 0, this.maxMp);
+    return this.mp - before;
+  }
+
+  /**
+   * Revive a fallen entity.
+   * @param {number} hp — HP to restore on revive
+   */
+  revive(hp) {
+    this._alive = true;
+    this.hp = clamp(hp, 1, this.maxHp);
+    this.statusEffects = [];
+    this._flashTimer = 0.3;
+  }
+
+  /**
+   * Tick a specific status effect by one turn (decrement duration).
+   * @param {string} statusId
+   */
+  tickStatus(statusId) {
+    const effect = this.statusEffects.find((s) => s.id === statusId);
+    if (effect) {
+      effect.remaining -= 1;
+      if (effect.remaining <= 0) {
+        this.removeStatus(statusId);
+      }
+    }
   }
 
   /**
@@ -139,7 +200,7 @@ export default class BattleEntity {
     this.hp -= amount;
     if (this.hp <= 0) {
       this.hp = 0;
-      this.isAlive = false;
+      this._alive = false;
     }
     // Wake on damage if sleeping
     if (effect.id !== 'sleep') {
@@ -165,7 +226,7 @@ export default class BattleEntity {
    * @returns {number} actual damage dealt
    */
   takeDamage(amount) {
-    if (!this.isAlive) return 0;
+    if (!this._alive) return 0;
 
     let damage = amount;
 
@@ -181,7 +242,7 @@ export default class BattleEntity {
 
     if (this.hp <= 0) {
       this.hp = 0;
-      this.isAlive = false;
+      this._alive = false;
       // Clear status effects on death
       this.statusEffects = [];
     } else {
@@ -200,7 +261,7 @@ export default class BattleEntity {
    * @returns {number} actual heal amount
    */
   heal(amount) {
-    if (!this.isAlive) return 0;
+    if (!this._alive) return 0;
     const before = this.hp;
     this.hp = clamp(this.hp + amount, 0, this.maxHp);
     return this.hp - before;
@@ -303,6 +364,7 @@ export default class BattleEntity {
    * Reset ATB gauge to 0.
    */
   resetATB() {
+    this.atb = 0;
     this.atbGauge = 0;
     this.isReady = false;
   }

@@ -121,9 +121,10 @@ export class SeededRandom {
   }
 }
 
-// XP curve: level n requires n*100 + n^2*50 total XP
+// XP curve: level n requires 30*n + 10*n^2 XP (gentler early game)
+// Level 1→2: 40, 2→3: 100, 3→4: 210, 5→6: 530, 10→11: 2100
 export function xpForLevel(level) {
-  return Math.floor(100 * level + 50 * level * level);
+  return Math.floor(30 * level + 10 * level * level);
 }
 
 export function levelFromXP(totalXP) {

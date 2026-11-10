@@ -96,16 +96,14 @@ export class WorldMap {
     // Update region (NPCs, particles, etc.)
     region.update(dt, this.player);
 
-    // Check for random encounter
+    // Check for random encounter (step-based only — prevents double-triggering)
     if (encounterResult === 'encounter') {
       return { type: 'encounter', zone: region.encounterZone };
     }
 
-    // Also check region-based encounter roll
-    const zone = region.checkEncounter(this.player, dt);
-    if (zone) {
-      return { type: 'encounter', zone };
-    }
+    // Note: Region.checkEncounter (time-based) is disabled to avoid
+    // double-triggering with the step-based system in Player.js.
+    // The step-based system gives more predictable encounter rates.
 
     // Check for region exit / transition
     const exit = region.getExitCheck(this.player);

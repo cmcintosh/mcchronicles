@@ -26,6 +26,7 @@ import DialogueBox from '../ui/DialogueBox.js';
 import HUD from '../ui/HUD.js';
 import MainMenu from '../ui/MainMenu.js';
 import BattleUI from '../battle/BattleUI.js';
+import TutorialPopup from '../ui/TutorialPopup.js';
 import { ABILITIES } from '../data/abilities.js';
 
 export const GameState = {
@@ -224,8 +225,11 @@ export class Game {
     if (this._audioInitialized) return;
     this._audioInitialized = true;
     try {
-      this.audioSystem.init();
-      this.audioSystem.playMusic('title');
+      this.audioSystem.init().then(() => {
+        this.audioSystem.playMusic('title');
+      }).catch(e => {
+        console.warn('Audio init failed:', e);
+      });
     } catch (e) {
       console.warn('Audio init failed:', e);
     }
@@ -354,6 +358,11 @@ export class Game {
 
     // Show opening dialogue
     this.startDialogue(STORY_BEATS.game_start);
+
+    // Show tutorial popup for first-time players (after dialogue)
+    setTimeout(() => {
+      TutorialPopup.showIfNeeded(this.container);
+    }, 2000);
 
     // Play overworld music
     this.audioSystem.playMusic('overworld', 'fry_valley');
@@ -541,7 +550,7 @@ export class Game {
         const treasure = chest.userData.treasureData;
         if (treasure) {
           this._addItem(treasure.item, 1);
-          this.audioSystem.playSFX('treasure');
+          this.audioSystem.playSFX('treasure_chest');
           this.startDialogue({
             id: `treasure_${treasure.item}`,
             dialogue: [{
@@ -559,7 +568,7 @@ export class Game {
     for (const sp of savePoints) {
       const dist = sp.position.distanceTo(this.playerPosition);
       if (dist < 3.0) {
-        this.audioSystem.playSFX('save');
+        this.audioSystem.playSFX('ui_save');
         this.save();
         this.startDialogue({
           id: 'save_point',
@@ -631,7 +640,8 @@ export class Game {
         if (entity.atbGauge >= 100) continue;
 
         const speed = entity.stats?.agi || entity.agi || 10;
-        entity.atbGauge += speed * dt * 8;
+        const speedMult = this.battleSpeed === 'fast' ? 2 : 1;
+        entity.atbGauge += speed * dt * 8 * speedMult;
 
         if (entity.atbGauge >= 100) {
           entity.atbGauge = 100;
@@ -647,6 +657,13 @@ export class Game {
         if (bd.activeEntity.isEnemy) {
           // Enemy AI turn
           this._executeEnemyTurn(bd.activeEntity, bd);
+        } else if (this.autoBattle) {
+          // Auto-battle: AI picks attack on random alive enemy
+          const aliveEnemies = bd.enemies.filter(e => e.isAlive);
+          if (aliveEnemies.length > 0) {
+            const target = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
+            this._executePlayerAction({ type: 'attack' }, target);
+          }
         } else {
           // Player turn — show command menu
           if (this.battleUI) {
@@ -685,6 +702,7 @@ export class Game {
 
     if (this.battleUI) {
       this.battleUI.showMessage(`${enemy.name} attacks ${target.name} for ${damage} damage!`);
+      this.battleUI.showDamageNumber(damage, false, 0.5, 0.6);
     }
 
     // Reset and continue
@@ -706,14 +724,20 @@ export class Game {
         target.currentHP = 0;
         target.isAlive = false;
       }
-      if (this.battleUI) this.battleUI.showMessage(`${actor.name} attacks ${target.name} for ${damage} damage!`);
+      if (this.battleUI) {
+        this.battleUI.showMessage(`${actor.name} attacks ${target.name} for ${damage} damage!`);
+        this.battleUI.showDamageNumber(damage, false, 0.5, 0.4);
+      }
     } else if (action.type === 'ability') {
       const ability = ABILITIES[action.abilityId];
       if (ability) {
         if (ability.type === 'heal') {
           const heal = Math.floor((actor.mag || actor.stats?.mag || 20) * ability.power);
           target.currentHP = Math.min(target.maxHP || target.stats?.hp || 100, (target.currentHP || 0) + heal);
-          if (this.battleUI) this.battleUI.showMessage(`${actor.name} uses ${ability.name}! ${target.name} recovers ${heal} HP!`);
+          if (this.battleUI) {
+            this.battleUI.showMessage(`${actor.name} uses ${ability.name}! ${target.name} recovers ${heal} HP!`);
+            this.battleUI.showDamageNumber(heal, true, 0.5, 0.4);
+          }
         } else if (ability.type === 'aoe' || ability.type === 'ultimate') {
           const targets = ability.target === 'enemies' ? bd.enemies.filter(e => e.isAlive) : bd.party.filter(p => p.isAlive);
           for (const t of targets) {
@@ -888,11 +912,15 @@ export class Game {
     // Show HUD
     this.hud.show();
 
-    // Play region music
+    // Play region music and ambient
     this.audioSystem.playMusic('overworld', regionId);
+    this.audioSystem.crossfadeAmbient(regionId, 2.0);
 
     // Auto-save on region change
     this.save();
+    if (this.hud) {
+      this.hud.showNotification('Auto-saved', 1500);
+    }
 
     // Trigger enter event
     if (regionData.storyEvents) {
@@ -983,7 +1011,8 @@ export class Game {
     this.state = GameState.BATTLE;
     this.sceneManager.setState('battle', { battle: this.battleData });
     this.hud.hide();
-    this.audioSystem.playMusic('battle', this.currentRegionId);
+    this.audioSystem.playSFX('encounter_alert');
+    this.audioSystem.transitionMusic('battle', this.currentRegionId, 0.5);
 
     // Create BattleUI
     if (this.battleUI) {
@@ -993,6 +1022,20 @@ export class Game {
     this.battleUI = new BattleUI(document.body);
     this.battleUI.create();
     this.battleUI._lastActiveEntity = null;
+
+    // Battle speed toggle
+    this.battleSpeed = 'normal';
+    this.battleUI.callbacks.onToggleSpeed = () => {
+      this.battleSpeed = this.battleSpeed === 'normal' ? 'fast' : 'normal';
+      return this.battleSpeed;
+    };
+
+    // Auto-battle toggle
+    this.autoBattle = false;
+    this.battleUI.callbacks.onToggleAuto = () => {
+      this.autoBattle = !this.autoBattle;
+      return this.autoBattle;
+    };
 
     // Set up battle UI callbacks
     this.battleUI.callbacks.onSelectCommand = (cmd) => {
@@ -1150,6 +1193,10 @@ export class Game {
 
     // Resume overworld music
     this.audioSystem.playMusic('overworld', this.currentRegionId);
+    this.audioSystem.startAmbient(this.currentRegionId);
+
+    // Autosave after battle
+    this._autoSave();
 
     this.battleData = null;
   }
@@ -1161,7 +1208,7 @@ export class Game {
     this.sceneManager.setState('menu', { menu: true });
     this.hud.hide();
     this.mainMenu.show(this.party, this.nemesisSystem, this.questSystem);
-    this.audioSystem.playSFX('menu_open');
+    this.audioSystem.playSFX('ui_menu_open');
   }
 
   closeMenu() {
@@ -1176,7 +1223,7 @@ export class Game {
       scene.add(this.playerMesh);
     }
 
-    this.audioSystem.playSFX('menu_close');
+    this.audioSystem.playSFX('ui_menu_close');
   }
 
   // === Dialogue ===
@@ -1262,6 +1309,42 @@ export class Game {
       this.saveSystem.autoSave(saveData);
     } catch (e) {
       console.warn('Failed to save:', e);
+    }
+  }
+
+  /**
+   * Auto-save with a brief HUD notification.
+   * @private
+   */
+  _autoSave() {
+    try {
+      const saveData = {
+        partyMemberIds: this.partyMemberIds,
+        recruitedIds: this.recruitedIds,
+        party: this.party.map(p => ({
+          id: p.id, level: p.level, xp: p.xp || 0,
+          currentHP: p.currentHP, currentMP: p.currentMP,
+          equipment: p.equipment || {},
+        })),
+        gold: this.gold,
+        inventory: this.inventory,
+        currentRegionId: this.currentRegionId,
+        playerPosition: { x: this.playerPosition.x, z: this.playerPosition.z },
+        playerRotation: this.playerRotation,
+        playTime: this.playTime,
+        steps: this.steps,
+        quests: this.questSystem ? this.questSystem.toData() : null,
+        nemesis: this.nemesisSystem ? this.nemesisSystem.toData() : null,
+        familiars: (this.familiars || []).map(f => f.toData ? f.toData() : f),
+        equippedFamiliars: this.equippedFamiliars || [],
+        timestamp: Date.now(),
+      };
+      this.saveSystem.autoSave(saveData);
+      if (this.hud) {
+        this.hud.showNotification('Auto-saved', 1500);
+      }
+    } catch (e) {
+      console.warn('Auto-save failed:', e);
     }
   }
 
@@ -1410,6 +1493,16 @@ export class Game {
       if (child.userData.treasureData && !child.userData.opened) {
         child.rotation.y = Math.sin(time * 0.8) * 0.1;
       }
+
+      // Grass wind animation — update shader time uniform
+      if (child.userData.type === 'grass' && child.userData.grassMaterial) {
+        child.userData.grassMaterial.uniforms.uTime.value = time;
+      }
+
+      // Water ripple animation — update shader time uniform
+      if (child.userData.type === 'water' && child.userData.waterMaterial) {
+        child.userData.waterMaterial.uniforms.uTime.value = time;
+      }
     });
   }
 
@@ -1420,6 +1513,7 @@ export class Game {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.sceneManager.onResize(w, h);
   }
 
   // === Cleanup ===
@@ -1427,7 +1521,7 @@ export class Game {
     window.removeEventListener('resize', this._onResize);
     this.renderer.dispose();
     this.inputSystem.dispose();
-    this.audioSystem.stopMusic();
+    this.audioSystem.dispose();
     this.titleScreen.hide();
     this.dialogueBox.hide();
     this.hud.hide();
