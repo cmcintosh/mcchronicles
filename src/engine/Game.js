@@ -673,6 +673,15 @@ export class Game {
       }
     }
 
+    // Auto-battle override: if auto-battle is ON and we're waiting for player input, auto-attack
+    if (bd.battleState === 'selecting' && bd.activeEntity && !bd.activeEntity.isEnemy && this.autoBattle) {
+      const aliveEnemies = bd.enemies.filter(e => e.isAlive);
+      if (aliveEnemies.length > 0) {
+        const target = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
+        this._executePlayerAction({ type: 'attack' }, target);
+      }
+    }
+
     // Escape with Escape key (only during idle or selecting)
     if (this.inputSystem.wasJustPressed('Escape') && bd.battleState === 'selecting' && !bd.activeEntity?.isEnemy) {
       if (this.battleUI) this.battleUI.hideCommandMenu();
