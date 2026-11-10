@@ -1,0 +1,4 @@
+# Meshy GLB models — large binary files, served from dist/
+public/models/*.glb
+public/models/*_thumb.png
+dist/models/
